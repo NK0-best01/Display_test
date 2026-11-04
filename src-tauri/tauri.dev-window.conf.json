@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ระบบทดสอบจอภาพ (Display Tester) - โหมดหน้าต่างพัฒนา",
+        "width": 1024,
+        "height": 768,
+        "fullscreen": false,
+        "decorations": true,
+        "resizable": true
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "สิทธิ์มาตรฐานสำหรับการควบคุมหน้าต่าง Fullscreen และการอ่านข้อมูลจอภาพ (Monitor)",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-current-monitor",
+    "core:window:allow-available-monitors",
+    "core:window:allow-primary-monitor",
+    "core:window:allow-scale-factor",
+    "core:window:allow-inner-size",
+    "core:window:allow-outer-size",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-size",
+    "core:window:allow-close"
+  ]
+}
+
