@@ -6,9 +6,10 @@ import { DeadPixelTestModule } from "./dead-pixel";
 import { LightBleedTestModule } from "./light-bleed";
 import { TouchAxisTestModule } from "./touch-axis";
 import { TouchLatencyTestModule } from "./touch-latency";
+import { VideoTestModule } from "./video";
 
 /**
- * สร้างรายการโมดูลทดสอบทั้งหมด 7 หัวข้อจริงครบถ้วนตามแผนงาน
+ * สร้างรายการโมดูลทดสอบทั้งหมด 8 หัวข้อจริงครบถ้วนตามแผนงาน v2
  */
 export function getAllTestModules(
   onStatusChange?: (status: string) => void
@@ -20,8 +21,9 @@ export function getAllTestModules(
   const lightBleedModule = new LightBleedTestModule(onStatusChange);
   const touchAxisModule = new TouchAxisTestModule(onStatusChange);
   const touchLatencyModule = new TouchLatencyTestModule(onStatusChange);
+  const videoModule = new VideoTestModule(onStatusChange);
 
-  // เรียงลำดับตาม 7 หัวข้อมาตรฐาน
+  // เรียงลำดับตาม 8 หัวข้อมาตรฐาน
   return [
     imageQualityModule, // 1. Image Quality (Real)
     multiTouchModule,   // 2. Multi-touch (Real)
@@ -30,6 +32,6 @@ export function getAllTestModules(
     lightBleedModule,   // 5. Light Bleed (Real)
     touchAxisModule,    // 6. Touch Axis (Real)
     touchLatencyModule, // 7. Touch Latency (Real)
+    videoModule,        // 8. Video (Real)
   ];
 }
-

@@ -202,6 +202,8 @@ export class AppRouter {
     // หากอยู่ในหน้าทดสอบ
     if (this.activeModule) {
       if (k === "Escape") {
+        this.activeModule.onKey(e);
+        if (e.defaultPrevented) return;
         e.preventDefault();
         await this.showMenu();
         return;

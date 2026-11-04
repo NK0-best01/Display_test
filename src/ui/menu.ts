@@ -15,6 +15,7 @@ const BADGE_COLORS: Record<TestModuleId, string> = {
   "light-bleed": "bg-purple-500/15 text-purple-400 border-purple-500/30",
   "touch-axis": "bg-orange-500/15 text-orange-400 border-orange-500/30",
   "touch-latency": "bg-red-500/15 text-red-400 border-red-500/30",
+  "video": "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
 };
 
 /**
@@ -70,7 +71,7 @@ export async function renderMainMenu(
         </div>
       </header>
 
-      <!-- ตารางปุ่มหัวข้อทดสอบ (Responsive Grid 4x2 รองรับ 7 หรือ 8 หัวข้อ พอดีจอ 1024x768 ไม่ล้น) -->
+      <!-- ตารางปุ่มหัวข้อทดสอบ (Responsive Grid 4x2 รองรับ 8 หัวข้อ พอดีจอ 1024x768 ไม่ล้น) -->
       <main class="my-auto py-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-4 xl:gap-5">
           ${modules

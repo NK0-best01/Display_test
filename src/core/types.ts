@@ -5,7 +5,8 @@ export type TestModuleId =
   | "dead-pixel"
   | "light-bleed"
   | "touch-axis"
-  | "touch-latency";
+  | "touch-latency"
+  | "video";
 
 export type PointerAction = "down" | "move" | "up" | "cancel";
 

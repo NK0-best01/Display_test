@@ -21,3 +21,7 @@ Thumbs.db
 *.sln
 *.sw?
 scratch/
+
+# Videos
+videos/*
+!videos/.gitkeep
