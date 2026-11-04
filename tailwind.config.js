@@ -6,6 +6,9 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Noto Sans Thai"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       screens: {
         'xga': '1024px',
       },
@@ -19,4 +22,3 @@ export default {
   },
   plugins: [],
 };
-

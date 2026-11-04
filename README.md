@@ -1,97 +1,99 @@
-# ระบบทดสอบจอภาพและจอสัมผัส (Display Tester)
+# ระบบทดสอบจอภาพและจอสัมผัส (Display & Touch Tester)
 
-แอปพลิเคชันเดสก์ท็อปสำหรับทดสอบคุณภาพจอภาพ (Display) และจอสัมผัส (Touchscreen) พัฒนาด้วย **Tauri v2**, **TypeScript**, **Vite**, และ **Tailwind CSS v3.4** รองรับทั้ง **Linux (X11)** และ **Windows**
-
----
-
-## รายการทดสอบทั้งหมด (7 หัวข้อ)
-
-1. **คุณภาพของภาพ (Image Quality)** — Grayscale ramp, Near-black/white, Gamma, Sharpness 1px, Geometry, Overscan
-2. **ทดสอบ Touch (Multi-touch และการวาด)** — รองรับหลายจุดสัมผัสพร้อมกัน, วาดเส้นต่อเนื่อง, ตารางเช็คพื้นที่สัมผัส (Grid)
-3. **ทดสอบสี (Color)** — สีเต็มจอ, SMPTE Color Bars, Gradient R/G/B, สีเทียบธรรมชาติ, White/Gray tint
-4. **Dead Pixel / Stuck Pixel** — วนสีเต็มจอพร้อมแว่นขยาย (Magnifier) และตัวนับมาร์กตำแหน่งจุดเสีย
-5. **แสงรั่วและความสม่ำเสมอของแสง (Light Bleed / Mura)** — จอดำสนิท, เทาเข้มละเอียดทีละระดับ, ตารางเทียบความสว่าง
-6. **เช็คทิศทาง Touch (Axis / Orientation)** — ตรวจสอบแกน X/Y กลับด้านหรือสลับแกนอัตโนมัติ (8 รูปแบบ)
-7. **วัดความหน่วงสัมผัส (Touch-to-Paint Latency)** — วัดเวลาตอบสนองฝั่งซอฟต์แวร์พร้อมกราฟสดและตรวจจับ Frame Drop
+แอปพลิเคชันเดสก์ท็อปประสิทธิภาพสูงสำหรับทดสอบคุณภาพพาเนลจอภาพ (Display) และจอสัมผัส (Touchscreen) ทุกชนิด พัฒนาด้วย **Tauri v2**, **Vanilla TypeScript**, **Vite**, และ **Tailwind CSS v3.4** รองรับการใช้งานเต็มจอ (Fullscreen) บนทั้ง **Linux (X11)** และ **Windows (10/11)** โดยแสดงผลข้อความภาษาไทยอย่างถูกต้องด้วยฟอนต์ **Noto Sans Thai** ที่ฝังมาในตัวโปรแกรม ไม่พึ่งพาฟอนต์ระบบ
 
 ---
 
-## การติดตั้งเครื่องมือเตรียมความพร้อม (Prerequisites)
+## 🎯 ฟีเจอร์และ 7 หัวข้อทดสอบมาตรฐาน
 
-### 1. เครื่องมือพื้นฐาน (ทั้ง Linux และ Windows)
-- **Node.js** (แนะนำ v18 หรือใหม่กว่า) และ `npm`
-- **Rust** (`rustup`, `cargo`, `rustc`) — ติดตั้งจาก [https://rustup.rs](https://rustup.rs)
+| ลำดับ | หัวข้อทดสอบ | รายละเอียดและรูปแบบทดสอบ | ปุ่มลัดเฉพาะหน้า |
+| :---: | :--- | :--- | :---: |
+| **1** | **คุณภาพของภาพ (Image Quality)** | • Grayscale ramp แบบต่อเนื่อง 256 ระดับ<br>• Grayscale แบบขั้น 16 และ 32 ระดับ<br>• Near-black (0-15) และ Near-white (240-255)<br>• Gamma calibration (ตาราง 1px สลับเทา 50%)<br>• Sharpness 1px H/V และ 1x1 Checkerboard<br>• Geometry 1:1 Aspect circles & Grid<br>• Overscan 0px & 1px borders | `←` `→` `Space` `Home` `End` |
+| **2** | **ทดสอบ Touch (Multi-touch & Draw)** | • ตรวจจับจุดสัมผัสพร้อมกัน $\ge$ 10 จุด แสดงตำแหน่ง, แรงกด, ขนาด<br>• โหมดวาดเส้นต่อเนื่อง (Coalesced Events)<br>• โหมดตารางเช็คพื้นที่สัมผัสทั่วจอ (Grid 16×12 = 192 ช่อง) | `1` `2` `3` (เปลี่ยนโหมด)<br>`C` (ล้างหน้าจอ) |
+| **3** | **ทดสอบสี (Color Accuracy & Gradient)** | • สีเดี่ยวเต็มจอ 8 สี (แดง, เขียว, น้ำเงิน, ขาว, ดำ, ฟ้า, ม่วง, เหลือง)<br>• SMPTE Color Bars และ PLUGE Pulses ตรวจเช็ค Black level<br>• Color Gradient 5 ชั้น (R, G, B, CMY, Full spectrum)<br>• ช่องสีอ้างอิงธรรมชาติ (สีผิวคน, สีท้องฟ้า, สีใบไม้)<br>• White & Gray Tint ตรวจสอบความสม่ำเสมอของสมดุลขาว 4 โซน<br>• **Debug Pixel Inspector**: ชี้เมาส์/ทัชแล้วกดอ่านค่า RGBA จริงบนพิกเซล | `←` `→` `Space`<br>`D` (เปิด/ปิด Inspector) |
+| **4** | **ตรวจจุดเสีย (Dead / Stuck Pixel)** | • วนสีเต็มจอ 5 สีหลัก (ดำ, ขาว, แดง, เขียว, น้ำเงิน)<br>• แว่นขยายติดตามนิ้ว/เมาส์ (Magnifier 4x, 6x, 8x) แบบ Nearest-Neighbor พร้อมตารางเส้นพิกเซลและระยะเยื้องป้องกันนิ้วบัง<br>• ระบบมาร์กจุดเสียและนับจำนวนในหน่วยความจำ (In-Memory)<br>• ซ่อนเคอร์เซอร์อัตโนมัติเมื่อหยุดนิ่ง 3 วินาที | `←` `→` `Space`<br>`M` (สลับขยาย 4x/6x/8x)<br>`คลิก/แตะสองครั้ง` (มาร์กจุดเสีย)<br>`C` หรือ `Del` (ล้างมาร์ก) |
+| **5** | **แสงรั่วและความสม่ำเสมอ (Light Bleed / Mura)** | • จอดำสนิท 0% สำหรับเช็คขอบจอรั่วในห้องมืด<br>• เทาเข้ม 5%, 10%, 15%, 20%, เทากลาง 50%, ขาว 100%<br>• ตารางเปรียบเทียบความสว่างโซน 3×3 และ 5×5<br>• แถบสไลเดอร์และปุ่มปรับระดับสีเทาละเอียดทีละ 1/255 (0-255)<br>• ระบบซ่อน UI และเคอร์เซอร์อัตโนมัติ 100% เมื่อหยุดนิ่ง 2.5 วินาที | `←` `→`<br>`↑` `↓` หรือ `+` `-`<br>(ปรับเทาทีละ 1/255)<br>`0`-`9` (เลือกพรีเซ็ต) |
+| **6** | **เช็คทิศทาง Touch (Axis / Orientation)** | • **Stage 1 (Calibration)**: แตะเป้า 4 มุมจอ ระบบคำนวณเวกเตอร์วิเคราะห์ความถูกต้องจาก 8 รูปแบบ (Normal, Invert X/Y, Rotate 180°, Swap Axes) พร้อมรายงานระดับความคลาดเคลื่อน<br>• ป้องกันการเดามั่ว: หากแตะคลาดเคลื่อนเกิน 18% จะแจ้ง *"ไม่แน่ใจ ลองใหม่"*<br>• **Stage 2 (Trail Test)**: โหมดลากนิ้วทแยงมุมเช็คทิศทางการเคลื่อนที่ | `1` `2` (สลับหน้า)<br>`R` (ทดสอบใหม่) |
+| **7** | **วัดความหน่วงสัมผัส (Touch Latency)** | • วัดเวลาตั้งแต่ระบบส่งสัญญาณสัมผัสจนถึงเฟรมที่วาดผลขึ้นจอ (Touch-to-Paint)<br>• ปรับฐานเวลาอัตโนมัติ (`normalizeEventTimeStamp`) รองรับ High-res และ Epoch time<br>• โครงสร้าง Zero Allocation ด้วย **Ring Buffer ขนาด 200 ตัวอย่าง**<br>• คำนวณ Avg, Min, Max, P95, และระดับประเมิน (<20ms ดีมาก, 20-40ms ดี, 40-80ms พอใช้, >80ms ช้า)<br>• กราฟคลื่นสด 200 ตัวอย่างล่าสุดพร้อมเส้นเกณฑ์อ้างอิง<br>• ตรวจจับ Frame Drop (>20ms)<br>• *หมายเหตุ: เป็นค่าความหน่วงฝั่งซอฟต์แวร์ ไม่รวมเวลาตอบสนองของพาเนลจอ* | `R` หรือ `C`<br>(รีเซ็ตสถิติ 200 ตัวอย่าง) |
 
-### 2. สำหรับ Linux (Ubuntu / Debian — X11)
-ติดตั้งแพ็กเกจระบบและ `webkit2gtk-4.1` ตามเอกสารทางการของ Tauri v2:
+---
+
+## ⌨️ ปุ่มลัดและการควบคุมมาตรฐาน (Global Navigation)
+
+ระบบถูกออกแบบให้ควบคุมได้สะดวกทั้งผ่าน **หน้าจอสัมผัส (Touchscreen)**, **เมาส์**, และ **คีย์บอร์ด**:
+
+| การกระทำ | คีย์บอร์ด | สัมผัส / เมาส์ |
+| :--- | :---: | :--- |
+| **กลับหน้าเมนูหลัก** | `Esc` | **กดค้างมุมซ้ายบนของจอเป็นเวลา 1 วินาที** (มีแถบ Progress แสดงสถานะ) หรือกดปุ่ม "เมนู" ใน HUD |
+| **ซ่อน / แสดง HUD มุมจอ** | `H` | **แตะ 3 นิ้วพร้อมกัน** หรือกดปุ่ม "ซ่อน (H)" ใน HUD |
+| **สลับโหมดเต็มจอ (Fullscreen)** | `F11` | กดปุ่ม "เปิด/ออกจากเต็มจอ" บนแถบเมนูหลัก |
+| **เปลี่ยนภาพทดสอบถัดไป / ก่อนหน้า** | `←` / `→` หรือ `Space` | ปัดซ้าย/ขวา หรือแตะครึ่งซ้าย/ขวาของหน้าจอ (เฉพาะหน้าที่ไม่ได้ใช้ทัชในการวาด) |
+| **เลือกหัวข้อทดสอบจากเมนูหลัก** | `1` - `7` | แตะหรือคลิกการ์ดหัวข้อที่ต้องการ |
+| **เปิดหน้าต่างข้อมูลจอภาพ (Info Modal)** | `I` | แตะปุ่ม "ข้อมูลจอภาพ (Info)" บนเมนูหลัก |
+
+---
+
+## 🖥️ สถาปัตยกรรมและความเข้ากันได้ (Architecture & Hardware Compatibility)
+
+1. **Pixel-Perfect Rendering**:
+   - ใช้งาน `syncCanvasPhysicalSize` ซึ่งคำนวณคูณค่า `window.devicePixelRatio` (DPR) เข้ากับความกว้าง/สูงจริงของจอภาพเสมอ
+   - บังคับใช้ `image-rendering: pixelated` และลบล้าง CSS filters, backdrop-filter, transitions, shadows ทั้งหมด เพื่อไม่ให้ WebView ทำการเกลี่ยสีหรือเบลอภาพทดสอบ
+2. **การปรับขนาดหน้าจอ (Responsive Design)**:
+   - ออกแบบ UI และขนาดปุ่มสัมผัสตามมาตรฐาน Kiosk โดยมีขนาดขั้นต่ำไม่น้อยกว่า `64×64 px` (`.touch-btn`)
+   - รองรับขนาดหน้าจอตั้งแต่ **1024×768 (XGA 4:3)** ขึ้นไปจนถึง **1280×720 (HD)**, **1920×1080 (FHD)**, **2K**, และ **4K** โดยไม่มีเนื้อหาล้นหรือทับซ้อน
+3. **ฟอนต์ภาษาไทยสมบูรณ์แบบ (Embedded Thai Typography)**:
+   - ฝังฟอนต์ **Noto Sans Thai** ผ่าน `@fontsource/noto-sans-thai` ในกระบวนการ Build
+   - ไม่ต้องติดตั้งฟอนต์ภาษาไทยเพิ่มเติมในระบบปฏิบัติการ Linux ช่วยตัดปัญหาตัวหนังสือเป็นสี่เหลี่ยม (Tofu □) บนระบบฝังตัวหรือ Kiosk
+
+---
+
+## 📦 การติดตั้งและการรันโปรเจกต์ (Installation & Running)
+
+### 1. เครื่องมือที่ต้องเตรียม (Prerequisites)
+- **Node.js** (v18 ขึ้นไป แนะนำ v20 หรือ v22)
+- **Rust Toolchain**: ติดตั้งผ่าน [https://rustup.rs](https://rustup.rs) (`rustup default stable`)
+- **Linux (Ubuntu / Debian - X11)**:
+  ```bash
+  sudo apt update
+  sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+  ```
+- **Windows (10 / 11)**:
+  - ติดตั้ง **Visual Studio C++ Build Tools** (เลือก Workload *"Desktop development with C++"*)
+  - ติดตั้ง **WebView2 Runtime** (มีพร้อมใช้งานใน Windows 10/11)
+
+### 2. คำสั่งรันโปรเจกต์
 
 ```bash
-sudo apt update
-sudo apt install -y \
-  libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
+# 1. ติดตั้ง Dependencies
+npm install
+
+# 2. รันโหมดทดสอบเฉพาะส่วนหน้าเว็บผ่าน Vite (รวดเร็ว เหมาะสำหรับทดสอบ UI ในเบราว์เซอร์)
+npm run dev
+# เปิดเบราว์เซอร์ที่ http://localhost:1420
+
+# 3. รันแอปพลิเคชันเดสก์ท็อปแบบหน้าต่างปรับขนาดได้ (สำหรับทดสอบ Responsive)
+npm run tauri:dev:window
+
+# 4. รันแอปพลิเคชันเดสก์ท็อปแบบเต็มจอจริง (Kiosk / Production Mode)
+npm run tauri:dev
+
+# 5. คอมไพล์และสร้างแพ็กเกจติดตั้ง (Production Build)
+npm run tauri:build
 ```
 
-### 3. สำหรับ Windows (Windows 10 / 11)
-1. **Microsoft C++ Build Tools**:
-   - ติดตั้งผ่าน Visual Studio Installer หรือรันคำสั่ง:
-     ```powershell
-     winget install Microsoft.VisualStudio.2022.BuildTools
-     ```
-   - เลือกติ๊กหัวข้อ **"Desktop development with C++"**
-2. **Microsoft Edge WebView2 Runtime**:
-   - มีติดตั้งมาให้แล้วใน Windows 10/11 รุ่นปัจจุบัน (หากไม่มีสามารถดาวน์โหลด Evergreen Bootstrapper ได้จากเว็บไซต์ Microsoft)
-3. **Rust**:
-   ```powershell
-   winget install Rustlang.Rustup
-   ```
+### 3. ผลลัพธ์ไฟล์ติดตั้ง (Build Outputs)
+เมื่อรันคำสั่ง `npm run tauri:build` โปรแกรมจะสร้างตัวติดตั้งในโฟลเดอร์ `src-tauri/target/release/bundle/`:
+- **Windows**: ตัวติดตั้ง **NSIS Setup (`.exe`)** และ **WiX MSI (`.msi`)**
+- **Linux**: ตัวติดตั้ง **Debian Package (`.deb`)** และ **AppImage (`.AppImage`)**
 
 ---
 
-## วิธีติดตั้งและรันโปรเจกต์
+## ⚠️ ข้อจำกัดและข้อแนะนำทางเทคนิค (Known Limitations & Tips)
 
-1. **ติดตั้ง Dependencies ฝั่ง Frontend**:
-   ```bash
-   npm install
-   ```
-
-2. **รันโหมดพัฒนาแบบเต็มจอจริง (ค่าเริ่มต้นตาม `tauri.conf.json`)**:
-   ```bash
-   npm run tauri dev
-   # หรือ
-   npm run tauri:dev
-   ```
-
-3. **รันโหมดหน้าต่างปกติที่ปรับขนาดได้ (สำหรับพัฒนาและทดสอบ Responsive บนจอขนาดใหญ่)**:
-   ```bash
-   npm run tauri:dev:window
-   ```
-
-4. **รันเฉพาะ Frontend ผ่าน Vite (สำหรับเช็ค UI อย่างรวดเร็วในเบราว์เซอร์)**:
-   ```bash
-   npm run dev
-   ```
-
-5. **การสร้างไฟล์ติดตั้ง (Build Production Package)**:
-   ```bash
-   npm run tauri build
-   ```
-
----
-
-## ปุ่มลัดและการควบคุมมาตรฐาน
-
-| การกระทำ | คีย์บอร์ด | ทัช / เมาส์ |
-|---|---|---|
-| สลับโหมดเต็มจอ (Fullscreen) | `F11` | ปุ่มสลับเต็มจอในเมนู |
-| ออกจากโหมดเต็มจอ / กลับเมนูหลัก | `Esc` | กดค้างมุมซ้ายบน 1 วินาที |
-| ซ่อน / แสดง HUD | `H` | แตะสามนิ้วพร้อมกัน |
-| เปลี่ยนภาพทดสอบถัดไป / ก่อนหน้า | `←` / `→` | ปัดซ้าย/ขวา หรือแตะครึ่งซ้าย/ขวาของจอ |
-
+1. **การวัดความหน่วง Touch-to-Paint (Software Latency)**:
+   - ค่าความหน่วงที่วัดได้ใน Part 7 เป็นเวลาตั้งแต่ระบบปฏิบัติการส่ง Pointer Event เข้าสู่โปรแกรม จนถึงรอบการวาดภาพเสร็จสมบูรณ์ (`requestAnimationFrame`)
+   - ค่านี้ **ไม่รวม** เวลาการตอบสนองทางกายภาพของผลึกจอ (Panel Pixel Response Time เช่น GtG 1ms - 15ms)
+2. **ระบบสัมผัสบน Linux**:
+   - ควรใช้งานบน Session แบบ **X11** เพื่อความแม่นยำสูงสุดในการรับส่งสัญญาณ Multi-touch และการสลับโหมด Fullscreen ตามข้อกำหนด
+3. **การเปิดแอปบนหน้าจอที่มีการขยายสเกล (Display Scaling > 100%)**:
+   - ระบบจะตรวจจับและแสดงค่า `devicePixelRatio` บนแถบสถานะด้านบน เพื่อให้ทราบความละเอียดจริงที่กำลังเรนเดอร์อยู่เสมอ

@@ -162,8 +162,8 @@
 ---
 
 ## Part 9: วัดความหน่วงการสัมผัส (Touch-to-Paint Latency)
-- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
-- **Branch**: `feat/part-9-touch-latency` (แตกสาขาจาก `feat/part-8-touch-axis`)
+- **สถานะ**: อัปโหลดขึ้น GitHub แล้ว (ยังไม่ merge เข้า `dev` ตามคำสั่งผู้ใช้)
+- **Branch**: `feat/part-9-touch-latency` (Push ไปที่ `origin/feat/part-9-touch-latency` เรียบร้อย)
 - **สิ่งที่ดำเนินการ**:
   1. สร้างโมดูลทดสอบจริง [`touch-latency.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/touch-latency.ts) สำหรับหัวข้อ "วัดความหน่วงการสัมผัส (Touch-to-Paint Latency)"
   2. จัดการความต่างของฐานเวลาด้วยฟังก์ชัน `normalizeEventTimeStamp(eTimestamp, currentNow)` เพื่อรองรับทั้ง High Resolution Time และ Epoch Time (> 1e11 ms)
@@ -182,10 +182,32 @@
      - ข้อความกำกับชัดเจนตามข้อกำหนด: *"ค่านี้เป็นความหน่วงฝั่งซอฟต์แวร์ ไม่รวมเวลาตอบสนองของพาเนลจอ"*
   7. รองรับปุ่ม `R` หรือ `C` เพื่อล้างสถิติ และเชื่อมโยงโมดูลจริงครบทั้ง 7 หัวข้อใน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts)
 - **ผลการทดสอบ (Verification Results)**:
-  - `npm run build` (`tsc && vite build`): ผ่านฉลุย ไม่มีข้อผิดพลาด (`dist/assets/index-Bsh7JRM0.js` 122.46 kB)
-  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 9 (`scratch/verify-part9.mjs`): **PASS 100% ทุกรายการ**
-    - `normalizeEventTimeStamp`: คำนวณถูกต้องทั้งกรณีเวลา High-res ปกติ, Clock Skew, และ Epoch Timestamp
-    - Ring Buffer 200 ตัวอย่าง: บันทึกและหมุนเวียนข้อมูลได้ถูกต้องแบบ Zero Allocation
-    - สถิติ & ระดับประเมิน: ตรวจสอบความถูกต้องของ Avg, Min, Max, P95 และ Rating ครบทุกช่วงเกณฑ์
-    - Keyboard / Reset: กดปุ่ม `R` รีเซ็ตค่าในบัฟเฟอร์และ Frame Drops เกลี้ยง
+  - `npm run build` (`tsc && vite build`): ผ่านฉลุย ไม่มีข้อผิดพลาด
+  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 9: **PASS 100% ทุกรายการ**
+
+---
+
+## Part 10: ขัดเกลา ตรวจสอบ และแพ็กเกจ (Polish, Verification & Packaging)
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-10-polish-package` (แตกสาขาจาก `feat/part-9-touch-latency`)
+- **สิ่งที่ดำเนินการ**:
+  1. **ฝังฟอนต์ภาษาไทยสมบูรณ์แบบ (Embedded Thai Typography)**:
+     - ติดตั้งแพ็กเกจ `@fontsource/noto-sans-thai` ฝังฟอนต์ **Noto Sans Thai** (น้ำหนัก 400, 600, 700) ไว้ใน Bundle ของโปรแกรมโดยตรง
+     - ตัดการพึ่งพาฟอนต์ระบบบน Linux ทำให้แสดงผลภาษาไทยถูกต้อง 100% ปราศจากปัญหาตัวสี่เหลี่ยม (Tofu □) บน Kiosk หรือระบบฝังตัว
+  2. **ตรวจสอบความลื่นไหลและ Responsive ทุกขนาดจอ**:
+     - หน้าเมนูหลักและ HUD ปรับขนาดตามหน้าจอได้อย่างสมบูรณ์ ไม่ล้น ไม่ตกขอบ ทั้งบนจอ 1024×768 (XGA 4:3), 1280×720 (HD), 1920×1080 (FHD), และจอ 4K
+     - ปุ่มสัมผัสทุกจุดมีขนาดไม่ต่ำกว่า `64×64 px` (`.touch-btn`) รองรับการสัมผัสด้วยนิ้วมือได้แม่นยำ
+     - วงจรการสลับหน้าและ Fullscreen สะอาดหมดจด ล้าง Event Listener และ Frame Loop ทุกครั้งเมื่อออกจากหน้าทดสอบ
+  3. **การตั้งค่าแพ็กเกจตัวติดตั้ง (Bundle Targets)**:
+     - กำหนด `targets: "all"` ใน `tauri.conf.json` ครอบคลุมทั้ง **NSIS (.exe) / WiX (.msi)** บน Windows และ **Debian (.deb) / AppImage (.AppImage)** บน Linux
+     - เตรียมไอคอนโปรแกรมครบถ้วนทุกขนาดใน `src-tauri/icons/`
+  4. **เขียนคู่มือการใช้งานฉบับสมบูรณ์ ([README.md](file:///d:/Ai/โปรเจค_roboq/display_test/README.md))**:
+     - อธิบาย 7 หัวข้อทดสอบมาตรฐานอย่างละเอียด
+     - ตารางปุ่มลัดมาตรฐานทั้งระบบ (Global Navigation Table)
+     - วิธีเตรียมเครื่องมือและคำสั่งรัน/บิลด์บนทั้ง Windows และ Linux
+     - ข้อจำกัดทางเทคนิคและข้อแนะนำการใช้งาน
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่านฉลุย Bundle ฟอนต์ WOFF2/WOFF ลงใน `dist/assets/` สำเร็จ (`dist/assets/index-ClqQrV7x.js` 122.46 kB, CSS 18.77 kB)
+  - รันชุดตรวจรับใหญ่ครอบคลุมทุกส่วน (`scratch/verify-master.mjs`): **PASS 100% ครบถ้วนทุกข้อกำหนด (Parts 1-10)**
+
 
