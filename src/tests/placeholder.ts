@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 interface PlaceholderSpec {
   id: TestModuleId;
@@ -61,10 +62,11 @@ export class PlaceholderTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    if (e.key === "ArrowRight" || e.key === " ") {
+    const k = normalizeKey(e);
+    if (k === "ArrowRight" || k === "Space") {
       e.preventDefault();
       this.nextPage();
-    } else if (e.key === "ArrowLeft") {
+    } else if (k === "ArrowLeft") {
       e.preventDefault();
       this.prevPage();
     }

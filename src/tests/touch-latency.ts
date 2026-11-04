@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 export interface LatencyStats {
   count: number;
@@ -87,7 +88,8 @@ export class TouchLatencyTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    if (e.key === "r" || e.key === "R" || e.key === "c" || e.key === "C") {
+    const k = normalizeKey(e);
+    if (k === "r" || k === "c") {
       e.preventDefault();
       this.resetStats();
     }

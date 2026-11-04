@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 export type OrientationPatternId =
   | "normal"
@@ -223,15 +224,18 @@ export class TouchAxisTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    if (e.key === "r" || e.key === "R" || e.key === "c" || e.key === "C") {
+    const k = normalizeKey(e);
+    if (!k) return;
+
+    if (k === "r" || k === "c") {
       e.preventDefault();
       this.resetCalibration();
-    } else if (e.key === "1") {
+    } else if (k === "1") {
       e.preventDefault();
       this.stage = "calibration";
       this.emitStatus();
       this.scheduleDraw();
-    } else if (e.key === "2" || e.key === "Tab") {
+    } else if (k === "2" || k === "Tab") {
       e.preventDefault();
       this.stage = "trail";
       this.trailStrokes = [];

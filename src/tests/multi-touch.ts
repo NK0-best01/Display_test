@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 export type TouchSubMode = "points" | "draw" | "grid";
 
@@ -91,19 +92,22 @@ export class MultiTouchTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    if (e.key === "1") {
+    const k = normalizeKey(e);
+    if (!k) return;
+
+    if (k === "1") {
       e.preventDefault();
       this.setSubMode("points");
-    } else if (e.key === "2") {
+    } else if (k === "2") {
       e.preventDefault();
       this.setSubMode("draw");
-    } else if (e.key === "3") {
+    } else if (k === "3") {
       e.preventDefault();
       this.setSubMode("grid");
-    } else if (e.key === "c" || e.key === "C" || e.key === "r" || e.key === "R" || e.key === "Delete") {
+    } else if (k === "c" || k === "r" || k === "Delete") {
       e.preventDefault();
       this.resetCurrentMode();
-    } else if (e.key === "Tab" || e.key === " ") {
+    } else if (k === "Tab" || k === "Space") {
       e.preventDefault();
       this.cycleSubMode();
     }

@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 interface PatternItem {
   id: string;
@@ -52,23 +53,21 @@ export class ImageQualityTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    if (
-      e.key === "ArrowRight" ||
-      e.key === " " ||
-      e.code === "Space" ||
-      e.key === "PageDown"
-    ) {
+    const k = normalizeKey(e);
+    if (!k) return;
+
+    if (k === "ArrowRight" || k === "Space" || k === "PageDown") {
       e.preventDefault();
       this.nextPattern();
-    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+    } else if (k === "ArrowLeft" || k === "PageUp") {
       e.preventDefault();
       this.prevPattern();
-    } else if (e.key === "Home") {
+    } else if (k === "Home") {
       e.preventDefault();
       this.currentIndex = 0;
       this.emitStatus();
       this.scheduleDraw();
-    } else if (e.key === "End") {
+    } else if (k === "End") {
       e.preventDefault();
       this.currentIndex = this.patterns.length - 1;
       this.emitStatus();

@@ -211,3 +211,23 @@
   - รันชุดตรวจรับใหญ่ครอบคลุมทุกส่วน (`scratch/verify-master.mjs`): **PASS 100% ครบถ้วนทุกข้อกำหนด (Parts 1-10)**
 
 
+---
+
+## Part 11: คีย์บอร์ดไทยหรืออังกฤษใช้ได้ทุกหน้า (Language-independent Keyboard Normalizer)
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-10-polish-package` (ตามข้อตกลงในแผน v2)
+- **สิ่งที่ดำเนินการ**:
+  1. สร้างโมดูลกลาง [`keys.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/core/keys.ts) พร้อมฟังก์ชัน `normalizeKey(e: KeyboardEvent)` คืนชื่อปุ่มมาตรฐานแบบตายตัวไม่ขึ้นกับภาษา
+  2. อ่านจาก `event.code` ทางกายภาพ (Physical key) เป็นลำดับแรก ทำให้ปุ่มลัดทุกปุ่ม (`KeyH`, `KeyD`, `KeyR`, `KeyC`, `KeyM`, `KeyG`, `KeyI`, `KeyZ`, `Digit1`-`Digit8`) กดติดทันทีไม่ว่าจะเปิดคีย์บอร์ดภาษาไทยหรืออังกฤษ
+  3. รองรับตัวเลข Numpad 1-8 แทน Digit 1-8 และเครื่องหมาย `+`/`-` ผ่าน `Equal`, `Minus`, `NumpadAdd`, `NumpadSubtract`
+  4. มีระบบ Fallback ตาราง Kedmanee สำหรับกรณีที่ `event.code` ว่างหรือเป็น `Unidentified` (เช่น บนบางสภาพแวดล้อม WebKitGTK/X11)
+  5. ปล่อยผ่าน System Modifiers (`ctrlKey`, `altKey`, `metaKey`) คืนค่าว่าง เพื่อไม่ดักจับคีย์ลัดของระบบปฏิบัติการ
+  6. ปรับแก้ทุกจุดที่เคยอ่าน `e.key` หรือ `e.code` ตรง ๆ ในทุกไฟล์ (`router.ts`, `image-quality.ts`, `multi-touch.ts`, `color.ts`, `dead-pixel.ts`, `light-bleed.ts`, `touch-axis.ts`, `touch-latency.ts`, `placeholder.ts`) ให้เรียกผ่าน `normalizeKey` ทั้งหมด
+  7. อัปเดตเอกสาร [`README.md`](file:///d:/Ai/โปรเจค_roboq/display_test/README.md) เพิ่มหมายเหตุเรื่องการใช้งานปุ่มลัดได้ทั้งภาษาไทยและอังกฤษ
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่าน 100% ไม่มีข้อผิดพลาด (`dist/assets/index-BrGyZV0Y.js` 124.20 kB)
+  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 11 (`scratch/verify-part11.mjs`): **PASS 100% ทุกรายการ**
+    - `event.code` mapping: ทำงานถูกต้องแม้ `key` เป็นตัวอักษรไทย (เช่น `KeyH` + `้` ได้ `'h'`, `KeyD` + `ก` ได้ `'d'`)
+    - Fallback Kedmanee: กรณี `code` ว่าง แปลงตัวอักษรไทยกลับเป็นปุ่มมาตรฐานถูกต้อง
+    - System Modifiers: ไม่ดักจับ Ctrl/Alt/Meta
+    - Grep Audit: ตรวจสอบทั้งโปรเจกต์ `src/` ไม่พบการอ่าน `e.key` / `e.code` ค้างในไฟล์อื่นเลย

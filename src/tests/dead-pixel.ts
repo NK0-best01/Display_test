@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 interface DefectPoint {
   x: number;
@@ -133,26 +134,28 @@ export class DeadPixelTestModule implements TestModule {
 
   public onKey(e: KeyboardEvent): void {
     this.resetCursorHideTimer();
+    const k = normalizeKey(e);
+    if (!k) return;
 
-    if (e.key === "ArrowRight" || e.key === "PageDown") {
+    if (k === "ArrowRight" || k === "PageDown") {
       e.preventDefault();
       this.nextColor();
-    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+    } else if (k === "ArrowLeft" || k === "PageUp") {
       e.preventDefault();
       this.prevColor();
-    } else if (e.key === "m" || e.key === "M" || e.key === "ท") {
+    } else if (k === "m") {
       e.preventDefault();
       this.toggleMagnifier();
-    } else if (e.key === "+" || e.key === "=") {
+    } else if (k === "+") {
       e.preventDefault();
       this.cycleZoom(1);
-    } else if (e.key === "-" || e.key === "_") {
+    } else if (k === "-") {
       e.preventDefault();
       this.cycleZoom(-1);
-    } else if (e.key === " " || e.code === "Space" || e.key === "Enter") {
+    } else if (k === "Space" || k === "Enter") {
       e.preventDefault();
       this.markDefectAtCurrentPointer();
-    } else if (e.key === "Delete" || e.key === "Backspace" || e.key === "c" || e.key === "C") {
+    } else if (k === "Delete" || k === "Backspace" || k === "c") {
       e.preventDefault();
       this.clearMarkers();
     }

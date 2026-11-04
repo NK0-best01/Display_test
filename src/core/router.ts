@@ -4,6 +4,7 @@ import { syncCanvasPhysicalSize } from "./display-info";
 import { setFullscreenState, toggleFullscreen } from "./fullscreen";
 import { renderMainMenu } from "../ui/menu";
 import { renderInfoModal } from "../ui/info-modal";
+import { normalizeKey } from "./keys";
 
 const CORNER_ZONE_PX = 96; // พื้นที่มุมซ้ายบน 96x96 CSS px สำหรับกดค้างกลับเมนู
 const CORNER_HOLD_MS = 1000; // กดค้าง 1 วินาที
@@ -177,10 +178,13 @@ export class AppRouter {
   }
 
   /**
-   * จัดการคีย์ลัดระดับแอป (F11, Esc, H, เลข 1-7 ในเมนู)
+   * จัดการคีย์ลัดระดับแอป (F11, Esc, H, เลข 1-8 ในเมนู) ผ่าน normalizeKey
    */
   private async handleGlobalKeyDown(e: KeyboardEvent): Promise<void> {
-    if (e.key === "F11") {
+    const k = normalizeKey(e);
+    if (!k) return;
+
+    if (k === "F11") {
       e.preventDefault();
       await toggleFullscreen();
       this.handleResize();
@@ -188,7 +192,7 @@ export class AppRouter {
     }
 
     // หากเปิดหน้าต่าง Info อยู่ กด Esc เพื่อปิด Info
-    if (this.infoModalOpen && e.key === "Escape") {
+    if (this.infoModalOpen && k === "Escape") {
       e.preventDefault();
       const closeBtn = document.getElementById("btn-close-info");
       closeBtn?.click();
@@ -197,12 +201,12 @@ export class AppRouter {
 
     // หากอยู่ในหน้าทดสอบ
     if (this.activeModule) {
-      if (e.key === "Escape") {
+      if (k === "Escape") {
         e.preventDefault();
         await this.showMenu();
         return;
       }
-      if (e.key === "h" || e.key === "H" || e.key === "้" || e.key === "ษ") {
+      if (k === "h") {
         e.preventDefault();
         this.hud?.toggle();
         return;
@@ -213,22 +217,22 @@ export class AppRouter {
       return;
     }
 
-    // หากอยู่ในหน้าเมนูหลัก: กด Esc ออกจาก Fullscreen, กด 1-7 เข้าหัวข้อทดสอบ, กด I เปิด Info
-    if (e.key === "Escape") {
+    // หากอยู่ในหน้าเมนูหลัก: กด Esc ออกจาก Fullscreen, กด 1-8 เข้าหัวข้อทดสอบ, กด I เปิด Info
+    if (k === "Escape") {
       e.preventDefault();
       await setFullscreenState(false);
       await this.showMenu();
       return;
     }
 
-    if (e.key === "i" || e.key === "I" || e.key === "ร" || e.key === "ณ") {
+    if (k === "i") {
       e.preventDefault();
       await this.openInfo();
       return;
     }
 
-    const num = Number.parseInt(e.key, 10);
-    if (num >= 1 && num <= this.moduleList.length) {
+    const num = Number.parseInt(k, 10);
+    if (!Number.isNaN(num) && num >= 1 && num <= this.moduleList.length) {
       e.preventDefault();
       const target = this.moduleList[num - 1];
       if (target) this.startTest(target.id);

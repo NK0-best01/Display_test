@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 type LightBleedModeId =
   | "black-0"
@@ -151,28 +152,30 @@ export class LightBleedTestModule implements TestModule {
 
   public onKey(e: KeyboardEvent): void {
     this.wakeUi();
+    const k = normalizeKey(e);
+    if (!k) return;
 
-    if (e.key === "ArrowRight" || e.key === "PageDown") {
+    if (k === "ArrowRight" || k === "PageDown") {
       e.preventDefault();
       this.nextPreset();
-    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+    } else if (k === "ArrowLeft" || k === "PageUp") {
       e.preventDefault();
       this.prevPreset();
-    } else if (e.key === "ArrowUp" || e.key === "+" || e.key === "=") {
+    } else if (k === "ArrowUp" || k === "+") {
       // เพิ่มระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(1);
-    } else if (e.key === "ArrowDown" || e.key === "-" || e.key === "_") {
+    } else if (k === "ArrowDown" || k === "-") {
       // ลดระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(-1);
-    } else if (e.key === "g" || e.key === "G") {
+    } else if (k === "g") {
       e.preventDefault();
       this.toggleGridMode();
-    } else if (e.key === "Home") {
+    } else if (k === "Home") {
       e.preventDefault();
       this.setGrayValue(0);
-    } else if (e.key === "End") {
+    } else if (k === "End") {
       e.preventDefault();
       this.setGrayValue(255);
     }
