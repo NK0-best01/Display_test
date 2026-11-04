@@ -4,11 +4,12 @@ import { MultiTouchTestModule } from "./multi-touch";
 import { ColorTestModule } from "./color";
 import { DeadPixelTestModule } from "./dead-pixel";
 import { LightBleedTestModule } from "./light-bleed";
+import { TouchAxisTestModule } from "./touch-axis";
 import { createPlaceholderModules } from "./placeholder";
 
 /**
  * สร้างรายการโมดูลทดสอบทั้งหมด 7 หัวข้อ
- * โดยหัวข้อที่พัฒนาแล้ว (เช่น ImageQuality, MultiTouch, Color, DeadPixel, LightBleed) จะใช้ตัวจริง
+ * โดยหัวข้อที่พัฒนาแล้ว (เช่น ImageQuality, MultiTouch, Color, DeadPixel, LightBleed, TouchAxis) จะใช้ตัวจริง
  * ส่วนหัวข้อที่เหลือจะใช้ Placeholder เพื่อให้ระบบทั้งหมดยังคงทำงานได้สมบูรณ์
  */
 export function getAllTestModules(
@@ -21,9 +22,9 @@ export function getAllTestModules(
   const colorModule = new ColorTestModule(onStatusChange);
   const deadPixelModule = new DeadPixelTestModule(onStatusChange);
   const lightBleedModule = new LightBleedTestModule(onStatusChange);
+  const touchAxisModule = new TouchAxisTestModule(onStatusChange);
 
   // เรียงลำดับตาม 7 หัวข้อมาตรฐาน
-  const touchAxisPlaceholder = placeholders.find((m) => m.id === "touch-axis")!;
   const touchLatencyPlaceholder = placeholders.find((m) => m.id === "touch-latency")!;
 
   return [
@@ -32,7 +33,7 @@ export function getAllTestModules(
     colorModule,             // 3. Color (Real)
     deadPixelModule,         // 4. Dead Pixel (Real)
     lightBleedModule,        // 5. Light Bleed (Real)
-    touchAxisPlaceholder,    // 6. Touch Axis (Placeholder)
+    touchAxisModule,         // 6. Touch Axis (Real)
     touchLatencyPlaceholder, // 7. Touch Latency (Placeholder)
   ];
 }
