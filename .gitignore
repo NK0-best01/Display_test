@@ -21,3 +21,6 @@ Thumbs.db
 *.sln
 *.sw?
 
+
+# Scratch
+scratch/

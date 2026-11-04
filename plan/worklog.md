@@ -130,8 +130,8 @@
 ---
 
 ## Part 8: เช็คทิศทาง Touch (Axis / Orientation)
-- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
-- **Branch**: `feat/part-8-touch-axis` (แตกสาขาจาก `feat/part-7-multi-touch`)
+- **สถานะ**: อัปโหลดขึ้น GitHub แล้ว (ยังไม่ merge เข้า `dev` ตามคำสั่งผู้ใช้)
+- **Branch**: `feat/part-8-touch-axis` (Push ไปที่ `origin/feat/part-8-touch-axis` เรียบร้อย)
 - **สิ่งที่ดำเนินการ**:
   1. สร้างโมดูลทดสอบจริง [`touch-axis.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/touch-axis.ts) สำหรับหัวข้อ "เช็คทิศทางและแกนสัมผัส (Touch Axis / Orientation)"
   2. พัฒนาระบบทดสอบครบทั้ง 2 หน้า/สเตจตามข้อกำหนด:
@@ -154,7 +154,38 @@
        - โหมดทดสอบลากเส้นทแยงมุมจากบนซ้ายไปล่างขวา เพื่อให้ผู้ใช้เห็นด้วยสายตาจริงว่าเส้นการเคลื่อนที่วิ่งตามปลายนิ้วถูกต้องตามแกนหรือไม่
   3. เชื่อมโยงโมดูลผ่าน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts)
 - **ผลการทดสอบ (Verification Results)**:
-  - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-DVhyDu3T.js` 122.81 kB)
-  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 8 (`scratch/verify-part8.mjs`): **PASS 100% ทุกรายการ**
+  - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error
+  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 8: **PASS 100% ทุกรายการ**
     - ตัดสินถูกต้อง 100% ครบทั้ง 8 รูปแบบการแปลงแกน
     - ทดสอบกรณีแตะพลาดซ้ำตรงกลาง: ระบบแสดง "ไม่แน่ใจ ลองใหม่" ถูกต้อง ไม่เดามั่ว
+
+---
+
+## Part 9: วัดความหน่วงการสัมผัส (Touch-to-Paint Latency)
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-9-touch-latency` (แตกสาขาจาก `feat/part-8-touch-axis`)
+- **สิ่งที่ดำเนินการ**:
+  1. สร้างโมดูลทดสอบจริง [`touch-latency.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/touch-latency.ts) สำหรับหัวข้อ "วัดความหน่วงการสัมผัส (Touch-to-Paint Latency)"
+  2. จัดการความต่างของฐานเวลาด้วยฟังก์ชัน `normalizeEventTimeStamp(eTimestamp, currentNow)` เพื่อรองรับทั้ง High Resolution Time และ Epoch Time (> 1e11 ms)
+  3. ออกแบบระบบประมวลผลประสิทธิภาพสูง **Zero Garbage Allocation**:
+     - ใช้ Ring Buffer ขนาดคงที่ 200 ตัวอย่าง ด้วย `Float32Array(200)` และ `scratchSortBuffer`
+     - ไม่มีการจัดสรรออบเจกต์ใหม่ (no object allocation) ภายใน Event Loop หรือ Animation Frame
+  4. คำนวณและแสดงผลสถิติแม่นยำ:
+     - ค่าเฉลี่ย (Avg), ต่ำสุด (Min), สูงสุด (Max), และ Percentile 95 (P95)
+     - ระดับการประเมิน (Rating): ดีมาก (<20 ms สีเขียว), ดี (20-40 ms สีฟ้า), พอใช้ (40-80 ms สีส้ม), ช้า (>80 ms สีแดง)
+  5. ระบบตรวจจับ Frame Drop: ตรวจนับเฟรมที่ `requestAnimationFrame` เว้นช่วงเกิน 20 ms เพื่อแจ้งเตือนอาการกระตุกของระบบเรนเดอร์
+  6. อินเทอร์เฟซผู้ใช้และการตอบสนอง:
+     - วงกลมรางวิ่งเป้าหมาย (Circle Track) เชิญชวนให้ลากนิ้วเป็นวงกลมต่อเนื่อง
+     - ตัวติดตามปลายนิ้ว (Active Pointer Target) พร้อมป้ายแสดงความหน่วงสดข้างนิ้ว
+     - แดชบอร์ดการ์ด 5 คอลัมน์ (AVG, P95, Min/Max, Rating, Frame Drops)
+     - กราฟสด 200 ตัวอย่างล่าสุด (Live Waveform) พร้อมเส้นขีดระดับอ้างอิงแนวนอน 20 ms, 40 ms, 80 ms
+     - ข้อความกำกับชัดเจนตามข้อกำหนด: *"ค่านี้เป็นความหน่วงฝั่งซอฟต์แวร์ ไม่รวมเวลาตอบสนองของพาเนลจอ"*
+  7. รองรับปุ่ม `R` หรือ `C` เพื่อล้างสถิติ และเชื่อมโยงโมดูลจริงครบทั้ง 7 หัวข้อใน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts)
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่านฉลุย ไม่มีข้อผิดพลาด (`dist/assets/index-Bsh7JRM0.js` 122.46 kB)
+  - รันชุดตรวจรับอัตโนมัติ Unit Test Part 9 (`scratch/verify-part9.mjs`): **PASS 100% ทุกรายการ**
+    - `normalizeEventTimeStamp`: คำนวณถูกต้องทั้งกรณีเวลา High-res ปกติ, Clock Skew, และ Epoch Timestamp
+    - Ring Buffer 200 ตัวอย่าง: บันทึกและหมุนเวียนข้อมูลได้ถูกต้องแบบ Zero Allocation
+    - สถิติ & ระดับประเมิน: ตรวจสอบความถูกต้องของ Avg, Min, Max, P95 และ Rating ครบทุกช่วงเกณฑ์
+    - Keyboard / Reset: กดปุ่ม `R` รีเซ็ตค่าในบัฟเฟอร์และ Frame Drops เกลี้ยง
+
