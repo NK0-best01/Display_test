@@ -1,6 +1,6 @@
 # บันทึกการทำงาน (Work Log) — โปรเจกต์ระบบทดสอบจอภาพ (Display Tester)
 
-เอกสารนี้เก็บประวัติและรายละเอียดการทำงานในแต่ละ Part ตามแผน [display-tester-plan.md](file:///d:/Ai/โปรเจค_roboq/display_test/plan/display-tester-plan.md)
+เอกสารนี้เก็บประวัติและรายละเอียดการทำงานในแต่ละ Part ตามแผน [display-tester-plan.md](file:///d:/Ai/โปรเจค_roboq\display_test\plan\display-tester-plan.md)
 
 ---
 
@@ -79,28 +79,16 @@
 ---
 
 ## Part 4: ทดสอบสี (Color)
-- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
-- **Branch**: `feat/part-4-color` (แตกสาขาจาก `feat/part-3-image-quality`)
+- **สถานะ**: อัปโหลดขึ้น GitHub แล้ว (ยังไม่ merge เข้า `dev` ตามคำสั่งผู้ใช้)
+- **Branch**: `feat/part-4-color` (Push ไปที่ `origin/feat/part-4-color` เรียบร้อย)
 - **สิ่งที่ดำเนินการ**:
   1. สร้างโมดูลทดสอบจริง [`color.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/color.ts) สำหรับหัวข้อ "ทดสอบสี (Color Accuracy & Gradient)"
   2. ออกแบบภาพทดสอบครบทั้ง 5 หมวดหลักตามข้อกำหนด (รวมเป็น 12 รูปแบบย่อย):
-     - **หมวดที่ 1 (สีเต็มจอ 8 สี)**:
-       - 1. แดง (Red: #FF0000 / rgb(255, 0, 0))
-       - 2. เขียว (Green: #00FF00 / rgb(0, 255, 0))
-       - 3. น้ำเงิน (Blue: #0000FF / rgb(0, 0, 255))
-       - 4. ขาว (White: #FFFFFF / rgb(255, 255, 255))
-       - 5. ดำ (Black: #000000 / rgb(0, 0, 0))
-       - 6. ฟ้าอมเขียว (Cyan: #00FFFF / rgb(0, 255, 255))
-       - 7. ม่วงแดง (Magenta: #FF00FF / rgb(255, 0, 255))
-       - 8. เหลือง (Yellow: #FFFF00 / rgb(255, 255, 0))
-     - **หมวดที่ 2 (Color Bars)**:
-       - 9. แถบสีมาตรฐาน SMPTE และ 8 Color Bars พร้อมแถบ Cast Bars และแท่ง PLUGE Pulses (-2%, 0%, +2% black)
-     - **หมวดที่ 3 (Gradient แยกช่องสี & สีผสม)**:
-       - 10. แถบ Gradient แยก 5 ชั้น: Red (0-255), Green (0-255), Blue (0-255), Cyan/Magenta/Yellow Blend และ Full Spectrum Rainbow
-     - **หมวดที่ 4 (ช่องสีเทียบธรรมชาติ)**:
-       - 11. ช่องสีเทียบอ้างอิง ColorChecker สำหรับดูด้วยสายตา: สีผิวคน 4 โทน (Fair, Medium/Tan, Deep Tan, Dark), สีท้องฟ้า/น้ำ 4 โทน, สีใบไม้/ดิน/หินธรรมชาติ 4 โทน
-     - **หมวดที่ 5 (White & Gray Tint ตรวจสีเพี้ยน)**:
-       - 12. แบ่ง 4 โซนบน-ล่าง: ขาวบริสุทธิ์ 100% (255), เทาสว่าง 75% (191), เทากลาง 50% (128), เทาเข้ม 25% (64)
+     - **หมวดที่ 1 (สีเต็มจอ 8 สี)**: แดง (#FF0000), เขียว (#00FF00), น้ำเงิน (#0000FF), ขาว (#FFFFFF), ดำ (#000000), ฟ้าอมเขียว (#00FFFF), ม่วงแดง (#FF00FF), เหลือง (#FFFF00)
+     - **หมวดที่ 2 (Color Bars)**: แถบสีมาตรฐาน SMPTE และ 8 Color Bars พร้อมแถบ Cast Bars และแท่ง PLUGE Pulses
+     - **หมวดที่ 3 (Gradient แยกช่องสี & สีผสม)**: แถบ Gradient 5 ชั้น: Red, Green, Blue, Cyan/Magenta/Yellow Blend และ Full Spectrum Rainbow
+     - **หมวดที่ 4 (ช่องสีเทียบธรรมชาติ)**: ช่องสีเทียบอ้างอิง ColorChecker สำหรับดูด้วยสายตา: สีผิวคน 4 โทน, สีท้องฟ้า/น้ำ 4 โทน, สีใบไม้/ดิน/หินธรรมชาติ 4 โทน
+     - **หมวดที่ 5 (White & Gray Tint ตรวจสีเพี้ยน)**: แบ่ง 4 โซนบน-ล่าง: ขาว 100%, เทา 75%, 50%, 25%
   3. พัฒนาระบบ **Debug Color Inspector / Pixel Picker**:
      - กดปุ่ม `D` เพื่อเปิด/ปิดโหมดตรวจสี
      - ใช้ฟังก์ชัน `readPixelAt(x, y)` อ่านค่าพิกเซลตรงจาก Canvas ผ่าน `ctx.getImageData()`
@@ -109,6 +97,38 @@
 - **ผลการทดสอบ (Verification Results)**:
   - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-CTdojBz5.js` 79.81 kB)
   - รันชุดตรวจรับอัตโนมัติ Part 4 (`scratch/verify-part4.mjs`): **PASS 100% ทุกรายการ**
-    - ตรวจสอบค่าสีดิบ RGB ครบทุกสีตรงตามนิยาม 100% (Red, Green, Blue, White, Black, Cyan, Magenta, Yellow, 100%, 75%, 50%, 25% Gray)
-    - ตรวจสอบระบบ `readPixelAt` ผ่าน `getImageData`
-    - ตรวจสอบว่า Canvas ปลอดจาก filter, shadow, opacity, transition อย่างเด็ดขาด
+
+---
+
+## Part 5: ทดสอบ Dead Pixel / Stuck Pixel
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-5-dead-pixel` (แตกสาขาจาก `feat/part-4-color`)
+- **สิ่งที่ดำเนินการ**:
+  1. สร้างโมดูลทดสอบจริง [`dead-pixel.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/dead-pixel.ts) สำหรับหัวข้อ "ตรวจจุดเสีย (Dead / Stuck Pixel)"
+  2. วนสีเต็มจอ 5 สีหลักตามข้อกำหนด: ดำ (Black), ขาว (White), แดง (Red), เขียว (Green), น้ำเงิน (Blue)
+     - จุดดำบนพื้นสีสว่าง = Dead pixel
+     - จุดสว่าง/สีบนพื้นดำ = Stuck / Hot pixel
+     - เติมสีเต็มทุกพิกเซลจริงด้วย `ctx.fillRect(0, 0, width, height)` ครอบคลุมทั้งจอโดยไม่มีขอบเว้น
+  3. พัฒนาระบบ **Magnifier (แว่นขยายติดตามนิ้ว/เมาส์ 4x, 6x, 8x)**:
+     - ปิด Image Smoothing (`ctx.imageSmoothingEnabled = false`) เพื่อแสดงผลแบบ Nearest-Neighbor เห็นแต่ละเม็ดพิกเซลเป็นช่องสี่เหลี่ยมคมชัด
+     - มีเส้นตารางพิกเซลจริง (Pixel Grid) ในเลนส์ ช่วยแยกแยะ Subpixel เสีย
+     - รองรับจอสัมผัส: มี Touch Offset เลื่อนเลนส์ขึ้นด้านบน 100px พร้อมเส้นประโยง เพื่อไม่ให้นิ้วของผู้ใช้บดบังพื้นที่ขยาย
+     - ปรับระดับการซูมได้ 4x, 6x, 8x ด้วยปุ่ม `+` / `-`
+  4. พัฒนาระบบ **ตัวนับและมาร์กตำแหน่งจุดเสีย (In-Memory Only)**:
+     - ผู้ใช้สามารถกด Spacebar / Enter หรือแตะสองครั้ง (Double-tap) เพื่อมาร์กตำแหน่งจุดเสีย
+     - แสดงวงแหวนเป้าเล็งและลำดับเลขกำกับพร้อมพิกัด `(x, y)` บนหน้าจอ
+     - มีแถบสรุปจำนวนจุดเสียด้านล่าง พร้อมปุ่มล้างมาร์กเกอร์ (ปุ่ม `C` หรือ `Del`)
+     - ข้อมูลถูกเก็บในหน่วยความจำเท่านั้น ไม่บันทึกลงไฟล์ตามข้อกำหนด
+  5. ระบบ **ซ่อนเคอร์เซอร์และ HUD**:
+     - ปิดการแสดงเคอร์เซอร์อัตโนมัติเมื่อไม่มีการขยับ 3 วินาที เพื่อให้มองเห็นทุกพิกเซลบนจออย่างหมดจด
+     - ซ่อนเคอร์เซอร์ขณะใช้งานแว่นขยาย
+     - กดปุ่ม `H` หรือแตะ 3 นิ้วเพื่อซ่อน HUD
+  6. เชื่อมโยงโมดูลผ่าน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts) ให้หัวข้อที่ 1, 3 และ 4 ทำงานด้วยคลาสจริง
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-DRTW_mSK.js` 89.58 kB)
+  - รันชุดตรวจรับอัตโนมัติ Part 5 (`scratch/verify-part5.mjs`): **PASS 100% ทุกรายการ**
+    - เติมสีเต็มจอ 5 สีหลักโดยไม่มีขอบเว้น
+    - แว่นขยาย Magnifier (4x, 6x, 8x) แบบ Nearest-Neighbor
+    - Touch Offset เลื่อนแว่นขยายไม่ให้นิ้วบังบนจอทัช
+    - ระบบบันทึกและล้างมาร์กเกอร์ในหน่วยความจำ
+    - ฟังก์ชันซ่อนเคอร์เซอร์อัตโนมัติ
