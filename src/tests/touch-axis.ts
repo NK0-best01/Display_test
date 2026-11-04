@@ -1,6 +1,5 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
-import { normalizeKey } from "../core/keys";
 
 export type OrientationPatternId =
   | "normal"
@@ -199,7 +198,8 @@ export class TouchAxisTestModule implements TestModule {
   public analysisResult: OrientationAnalysisResult | null = null;
 
   // สำหรับโหมดลากเส้นทแยงมุม (Stage 2)
-  private trailStrokes: Array<{ x: number; y: number; time: number }> = [];
+  private completedStrokes: Array<Array<{ x: number; y: number }>> = [];
+  private activeStrokes: Map<number, Array<{ x: number; y: number }>> = new Map();
 
   constructor(onStatusChange?: (status: string) => void) {
     this.onStatusChange = onStatusChange;
@@ -224,23 +224,24 @@ export class TouchAxisTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    const k = normalizeKey(e);
-    if (!k) return;
+    const isR = e.code === "KeyR" || e.key === "r" || e.key === "R" || e.key === "พ";
+    const isC = e.code === "KeyC" || e.key === "c" || e.key === "C" || e.key === "แ";
+    const is1 = e.code === "Digit1" || e.code === "Numpad1" || e.key === "1" || e.key === "ArrowLeft";
+    const is2 = e.code === "Digit2" || e.code === "Numpad2" || e.key === "2" || e.key === "ArrowRight" || e.key === "Tab";
 
-    if (k === "r" || k === "c") {
+    if (isR || isC) {
       e.preventDefault();
-      this.resetCalibration();
-    } else if (k === "1") {
+      if (this.stage === "calibration") {
+        this.resetCalibration();
+      } else {
+        this.clearTrailStrokes();
+      }
+    } else if (is1) {
       e.preventDefault();
-      this.stage = "calibration";
-      this.emitStatus();
-      this.scheduleDraw();
-    } else if (k === "2" || k === "Tab") {
+      this.setStage("calibration");
+    } else if (is2) {
       e.preventDefault();
-      this.stage = "trail";
-      this.trailStrokes = [];
-      this.emitStatus();
-      this.scheduleDraw();
+      this.setStage("trail");
     }
   }
 
@@ -254,6 +255,13 @@ export class TouchAxisTestModule implements TestModule {
     const normX = Math.max(0, Math.min(1, physX / this.canvas.width));
     const normY = Math.max(0, Math.min(1, physY / this.canvas.height));
 
+    // ตรวจสอบการกดปุ่มเปลี่ยนแท็บหรือปุ่มควบคุมล่างจอ
+    if (e.type === "pointerdown") {
+      if (this.handleButtonsPointerDown(physX, physY, this.canvas.width, this.canvas.height, dpr)) {
+        return;
+      }
+    }
+
     if (this.stage === "calibration") {
       if (e.type === "pointerdown") {
         if (this.currentStep < 4) {
@@ -261,7 +269,6 @@ export class TouchAxisTestModule implements TestModule {
           this.rawTouchedPixels.push({ x: physX, y: physY });
           this.currentStep++;
 
-          // เมื่อแตะครบ 4 จุด ให้คำนวณทันที
           if (this.currentStep === 4) {
             this.analysisResult = evaluateTouchOrientation(
               TARGET_CORNERS_NORMALIZED,
@@ -276,14 +283,25 @@ export class TouchAxisTestModule implements TestModule {
         }
       }
     } else if (this.stage === "trail") {
-      if (e.type === "pointerdown" || e.type === "pointermove") {
-        if (e.buttons > 0 || e.pointerType === "touch") {
-          this.trailStrokes.push({ x: physX, y: physY, time: performance.now() });
-          if (this.trailStrokes.length > 500) {
-            this.trailStrokes.shift();
-          }
+      if (e.type === "pointerdown") {
+        // เริ่ม Stroke ใหม่เฉพาะนิ้ว/พอยน์เตอร์นี้ (แยก stroke ป้องกันเส้นโผล่เชื่อมเอง 15.1)
+        this.activeStrokes.set(e.pointerId, [{ x: physX, y: physY }]);
+        this.scheduleDraw();
+      } else if (e.type === "pointermove") {
+        const stroke = this.activeStrokes.get(e.pointerId);
+        if (stroke && (e.buttons > 0 || e.pointerType === "touch")) {
+          stroke.push({ x: physX, y: physY });
+          if (stroke.length > 300) stroke.shift();
           this.scheduleDraw();
         }
+      } else if (e.type === "pointerup" || e.type === "pointercancel" || e.type === "pointerleave") {
+        const stroke = this.activeStrokes.get(e.pointerId);
+        if (stroke && stroke.length > 0) {
+          this.completedStrokes.push(stroke);
+          if (this.completedStrokes.length > 30) this.completedStrokes.shift();
+        }
+        this.activeStrokes.delete(e.pointerId);
+        this.scheduleDraw();
       }
     }
   }
@@ -299,6 +317,23 @@ export class TouchAxisTestModule implements TestModule {
     this.touchedPoints = [];
     this.rawTouchedPixels = [];
     this.analysisResult = null;
+    this.emitStatus();
+    this.scheduleDraw();
+  }
+
+  public clearTrailStrokes(): void {
+    this.completedStrokes = [];
+    this.activeStrokes.clear();
+    this.emitStatus();
+    this.scheduleDraw();
+  }
+
+  public setStage(stage: "calibration" | "trail"): void {
+    if (this.stage === stage) return;
+    this.stage = stage;
+    if (stage === "trail") {
+      this.clearTrailStrokes();
+    }
     this.emitStatus();
     this.scheduleDraw();
   }
@@ -548,20 +583,26 @@ export class TouchAxisTestModule implements TestModule {
     ctx.arc(endX, endY, Math.round(12 * dpr), 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. วาดรอยเส้นลากนิ้วของผู้ใช้ (User Trail)
-    if (this.trailStrokes.length >= 2) {
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
+    // 2. วาดรอยเส้นลากนิ้วของผู้ใช้ (User Trail) แยกแต่ละ Stroke ชัดเจน ป้องกันเส้นโผล่เชื่อมจุด (15.1)
+    const allStrokes = [...this.completedStrokes, ...this.activeStrokes.values()];
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-      for (let i = 1; i < this.trailStrokes.length; i++) {
-        const p1 = this.trailStrokes[i - 1]!;
-        const p2 = this.trailStrokes[i]!;
-
+    for (const stroke of allStrokes) {
+      if (stroke.length === 1) {
+        // แตะจุดเดียว วาดวงกลมจุดสัมผัส
+        ctx.fillStyle = "#f97316";
+        ctx.beginPath();
+        ctx.arc(stroke[0]!.x, stroke[0]!.y, Math.round(4 * dpr), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (stroke.length > 1) {
         ctx.strokeStyle = "#f97316";
         ctx.lineWidth = Math.max(3, Math.round(5 * dpr));
         ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
+        ctx.moveTo(stroke[0]!.x, stroke[0]!.y);
+        for (let i = 1; i < stroke.length; i++) {
+          ctx.lineTo(stroke[i]!.x, stroke[i]!.y);
+        }
         ctx.stroke();
       }
     }
@@ -586,6 +627,99 @@ export class TouchAxisTestModule implements TestModule {
       cx,
       Math.round(95 * dpr)
     );
+
+    // 3. วาดปุ่มควบคุมล่างจอสำหรับหน้า 6.2 (15.2: ปุ่มเฉพาะหน้า ล้างเส้น + กลับไปแตะ 4 มุม)
+    this.drawTrailActionButtons(ctx, w, h, dpr);
+  }
+
+  private drawTrailActionButtons(
+    ctx: CanvasRenderingContext2D,
+    w: number,
+    h: number,
+    dpr: number
+  ): void {
+    const btnW = Math.round(200 * dpr);
+    const btnH = Math.round(48 * dpr);
+    const btnGap = Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(28 * dpr);
+
+    // ปุ่ม ล้างเส้น (R)
+    const btn1X = w / 2 - btnW - btnGap / 2;
+    ctx.fillStyle = "#27272a";
+    ctx.fillRect(btn1X, btnY, btnW, btnH);
+    ctx.strokeStyle = "#52525b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btn1X, btnY, btnW, btnH);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("ล้างเส้น (R)", btn1X + btnW / 2, btnY + btnH / 2);
+
+    // ปุ่ม กลับไปแตะ 4 มุม (1)
+    const btn2X = w / 2 + btnGap / 2;
+    ctx.fillStyle = "#ea580c";
+    ctx.fillRect(btn2X, btnY, btnW, btnH);
+    ctx.strokeStyle = "#f97316";
+    ctx.strokeRect(btn2X, btnY, btnW, btnH);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("← กลับไปแตะ 4 มุม [1]", btn2X + btnW / 2, btnY + btnH / 2);
+  }
+
+  private handleButtonsPointerDown(
+    px: number,
+    py: number,
+    w: number,
+    h: number,
+    dpr: number
+  ): boolean {
+    // 1. ตรวจสอบแท็บด้านบน
+    const tabH = Math.round(44 * dpr);
+    const totalW = Math.min(w - Math.round(40 * dpr), Math.round(520 * dpr));
+    const startX = (w - totalW) / 2;
+    const startY = Math.round(10 * dpr);
+    const tabW = totalW / 2;
+
+    if (py >= startY && py <= startY + tabH) {
+      if (px >= startX && px < startX + tabW) {
+        this.setStage("calibration");
+        return true;
+      } else if (px >= startX + tabW && px <= startX + totalW) {
+        this.setStage("trail");
+        return true;
+      }
+    }
+
+    // 2. ตรวจสอบปุ่มล่างจอ
+    const btnW = Math.round(200 * dpr);
+    const btnH = Math.round(56 * dpr); // ขยายขอบเขตสัมผัสให้แตะง่าย
+    const btnGap = Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(24 * dpr);
+
+    if (py >= btnY && py <= h) {
+      const btn1X = w / 2 - btnW - btnGap / 2;
+      const btn2X = w / 2 + btnGap / 2;
+
+      if (px >= btn1X && px <= btn1X + btnW) {
+        if (this.stage === "calibration") {
+          this.resetCalibration();
+        } else {
+          this.clearTrailStrokes();
+        }
+        return true;
+      } else if (px >= btn2X && px <= btn2X + btnW) {
+        if (this.stage === "calibration") {
+          this.setStage("trail");
+        } else {
+          this.setStage("calibration");
+        }
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private drawTopNavTabs(

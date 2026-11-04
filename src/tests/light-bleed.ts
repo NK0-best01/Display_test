@@ -1,6 +1,5 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
-import { normalizeKey } from "../core/keys";
 
 type LightBleedModeId =
   | "black-0"
@@ -11,7 +10,6 @@ type LightBleedModeId =
   | "gray-50"
   | "white-100"
   | "custom-gray"
-  | "grid-3x3"
   | "grid-5x5";
 
 interface LightBleedPreset {
@@ -28,7 +26,7 @@ export class LightBleedTestModule implements TestModule {
   public readonly id: TestModuleId = "light-bleed";
   public readonly title = "5. แสงรั่วและความสม่ำเสมอของแสง (Light Bleed / Mura)";
   public readonly description =
-    "จอดำสนิท เทาเข้มปรับละเอียดทีละ 1/255 และตาราง 3×3 / 5×5 เทียบความสม่ำเสมอของแสง";
+    "จอดำสนิท เทาเข้มปรับละเอียดทีละ 1/255 และตาราง 5×5 (25 โซน) เทียบความสม่ำเสมอของแสง";
   public readonly controlsHint =
     "ลูกศร ← / → สลับโหมด | ↑ / ↓ หรือ +/- ปรับเทาทีละ 1/255 | UI จะซ่อนอัตโนมัติใน 2 วินาที | Esc กลับเมนู";
   public readonly usesTouchDirectly = false;
@@ -98,15 +96,7 @@ export class LightBleedTestModule implements TestModule {
       defaultGray: 30,
       guide: "ใช้ปุ่ม ↑ / ↓ หรือ +/- หรือลากนิ้ว เพื่อปรับสีเทาละเอียดทีละ 1/255",
     },
-    {
-      id: "grid-3x3",
-      name: "ตารางโซน 3×3 (9 โซนเทียบความสว่าง)",
-      defaultGray: 38,
-      isGrid: true,
-      gridCols: 3,
-      gridRows: 3,
-      guide: "เทียบความสว่างสัมพัทธ์ระหว่างโซนกลางจอกับขอบจอ 9 ส่วน",
-    },
+    
     {
       id: "grid-5x5",
       name: "ตารางโซน 5×5 (25 โซนเทียบความสว่าง)",
@@ -152,30 +142,28 @@ export class LightBleedTestModule implements TestModule {
 
   public onKey(e: KeyboardEvent): void {
     this.wakeUi();
-    const k = normalizeKey(e);
-    if (!k) return;
 
-    if (k === "ArrowRight" || k === "PageDown") {
+    if (e.key === "ArrowRight" || e.key === "PageDown") {
       e.preventDefault();
       this.nextPreset();
-    } else if (k === "ArrowLeft" || k === "PageUp") {
+    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
       e.preventDefault();
       this.prevPreset();
-    } else if (k === "ArrowUp" || k === "+") {
+    } else if (e.key === "ArrowUp" || e.key === "+" || e.key === "=") {
       // เพิ่มระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(1);
-    } else if (k === "ArrowDown" || k === "-") {
+    } else if (e.key === "ArrowDown" || e.key === "-" || e.key === "_") {
       // ลดระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(-1);
-    } else if (k === "g") {
+    } else if (e.code === "KeyG" || e.key === "g" || e.key === "G" || e.key === "เ") {
       e.preventDefault();
       this.toggleGridMode();
-    } else if (k === "Home") {
+    } else if (e.key === "Home") {
       e.preventDefault();
       this.setGrayValue(0);
-    } else if (k === "End") {
+    } else if (e.key === "End") {
       e.preventDefault();
       this.setGrayValue(255);
     }
@@ -247,8 +235,8 @@ export class LightBleedTestModule implements TestModule {
       // กลับมาโหมดสีเดียว
       this.currentPresetIndex = 0;
     } else {
-      // สลับไปโหมดตาราง 3x3
-      const gridIndex = this.presets.findIndex((p) => p.id === "grid-3x3");
+      // สลับไปโหมดตาราง 5x5
+      const gridIndex = this.presets.findIndex((p) => p.id === "grid-5x5");
       if (gridIndex >= 0) this.currentPresetIndex = gridIndex;
     }
     this.currentGrayValue = this.presets[this.currentPresetIndex]?.defaultGray ?? 0;
@@ -341,7 +329,7 @@ export class LightBleedTestModule implements TestModule {
     const gray = this.currentGrayValue;
 
     if (curPreset?.isGrid && curPreset.gridCols && curPreset.gridRows) {
-      // 1. โหมดตารางเทียบความสว่างระหว่างโซน (3x3 หรือ 5x5)
+      // 1. โหมดตารางเทียบความสว่างระหว่างโซน 5x5 (25 โซน)
       this.drawZoneGrid(ctx, width, height, dpr, curPreset.gridCols, curPreset.gridRows, gray);
     } else {
       // 2. โหมดเติมสีเต็มจอ 100% ปลอดสิ่งบดบัง

@@ -1,6 +1,5 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
-import { normalizeKey } from "../core/keys";
 
 interface ColorPatternItem {
   id: string;
@@ -30,6 +29,7 @@ export class ColorTestModule implements TestModule {
 
   // โหมด Debug Inspector เพื่ออ่านค่า pixel จาก canvas ตามเกณฑ์ตรวจรับ
   private debugInspectorActive = false;
+  private targetPhysicalPos: { x: number; y: number } | null = null;
   private inspectedPixel: { x: number; y: number; r: number; g: number; b: number; hex: string } | null = null;
 
   public patterns: ColorPatternItem[] = [];
@@ -62,26 +62,28 @@ export class ColorTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    const k = normalizeKey(e);
-    if (!k) return;
-
-    if (k === "ArrowRight" || k === "Space" || k === "PageDown") {
+    if (
+      e.key === "ArrowRight" ||
+      e.key === " " ||
+      e.code === "Space" ||
+      e.key === "PageDown"
+    ) {
       e.preventDefault();
       this.nextPattern();
-    } else if (k === "ArrowLeft" || k === "PageUp") {
+    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
       e.preventDefault();
       this.prevPattern();
-    } else if (k === "Home") {
+    } else if (e.key === "Home") {
       e.preventDefault();
       this.currentIndex = 0;
       this.emitStatus();
       this.scheduleDraw();
-    } else if (k === "End") {
+    } else if (e.key === "End") {
       e.preventDefault();
       this.currentIndex = this.patterns.length - 1;
       this.emitStatus();
       this.scheduleDraw();
-    } else if (k === "d") {
+    } else if (e.code === "KeyD" || e.key === "d" || e.key === "D" || e.key === "ก" || e.key === "ด") {
       e.preventDefault();
       this.toggleDebugInspector();
     }
@@ -94,12 +96,12 @@ export class ColorTestModule implements TestModule {
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
 
-      if (this.debugInspectorActive) {
-        this.samplePixelAt(e.clientX, e.clientY);
+      if (this.debugInspectorActive && this.canvas) {
+        this.updateTargetPosFromPointer(e.clientX, e.clientY);
       }
     } else if (e.type === "pointermove") {
-      if (this.debugInspectorActive && (e.buttons > 0 || e.pointerType === "mouse")) {
-        this.samplePixelAt(e.clientX, e.clientY);
+      if (this.debugInspectorActive && (e.buttons > 0 || e.pointerType === "mouse") && this.canvas) {
+        this.updateTargetPosFromPointer(e.clientX, e.clientY);
       }
     } else if (e.type === "pointerup") {
       if (this.pointerStartX !== null) {
@@ -147,12 +149,8 @@ export class ColorTestModule implements TestModule {
 
   public toggleDebugInspector(): void {
     this.debugInspectorActive = !this.debugInspectorActive;
-    if (!this.debugInspectorActive) {
-      this.inspectedPixel = null;
-    } else if (this.canvas) {
-      // สุ่มตัวอย่างตรงกลางจอเป็นค่าเริ่มต้น
-      this.samplePixelAt(window.innerWidth / 2, window.innerHeight / 2);
-    }
+    this.targetPhysicalPos = null;
+    this.inspectedPixel = null;
     this.emitStatus();
     this.scheduleDraw();
   }
@@ -185,25 +183,16 @@ export class ColorTestModule implements TestModule {
     };
   }
 
-  private samplePixelAt(clientX: number, clientY: number): void {
-    if (!this.canvas || !this.ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const physX = Math.round(clientX * dpr);
-    const physY = Math.round(clientY * dpr);
-
-    const px = this.readPixelAt(physX, physY);
-    if (!px) return;
-
-    const toHex = (n: number) => n.toString(16).padStart(2, "0").toUpperCase();
-    const hex = `#${toHex(px.r)}${toHex(px.g)}${toHex(px.b)}`;
-
-    this.inspectedPixel = {
-      x: physX,
-      y: physY,
-      r: px.r,
-      g: px.g,
-      b: px.b,
-      hex,
+  private updateTargetPosFromPointer(clientX: number, clientY: number): void {
+    if (!this.canvas) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const px = Math.round((clientX - rect.left) * scaleX);
+    const py = Math.round((clientY - rect.top) * scaleY);
+    this.targetPhysicalPos = {
+      x: Math.max(0, Math.min(this.canvas.width - 1, px)),
+      y: Math.max(0, Math.min(this.canvas.height - 1, py)),
     };
     this.scheduleDraw();
   }
@@ -234,8 +223,29 @@ export class ColorTestModule implements TestModule {
       pattern.draw(this.ctx, width, height, dpr);
     }
 
-    // วาด HUD / Badge ของ Debug Inspector (ถ้าเปิดอยู่)
-    if (this.debugInspectorActive && this.inspectedPixel) {
+    // อ่านค่าสีจากภาพทดสอบ "ก่อน" วาด Overlay ใด ๆ ทับ (แก้ปัญหาอ่านโดนสีเป้าเล็ง 0/255 ตามข้อกำหนด Part 13)
+    if (this.debugInspectorActive) {
+      const targetX = this.targetPhysicalPos?.x ?? Math.floor(width / 2);
+      const targetY = this.targetPhysicalPos?.y ?? Math.floor(height / 2);
+      const clampedX = Math.max(0, Math.min(width - 1, Math.floor(targetX)));
+      const clampedY = Math.max(0, Math.min(height - 1, Math.floor(targetY)));
+
+      const pixelData = this.ctx.getImageData(clampedX, clampedY, 1, 1).data;
+      const r = pixelData[0] ?? 0;
+      const g = pixelData[1] ?? 0;
+      const b = pixelData[2] ?? 0;
+      const toHex = (n: number) => n.toString(16).padStart(2, "0").toUpperCase();
+
+      this.inspectedPixel = {
+        x: clampedX,
+        y: clampedY,
+        r,
+        g,
+        b,
+        hex: `#${toHex(r)}${toHex(g)}${toHex(b)}`,
+      };
+
+      // วาด Overlay แสดงค่าสีและเป้าเล็งทับลงไปหลังจากอ่านค่าเสร็จแล้วเท่านั้น
       this.drawDebugOverlay(this.ctx, width, height, dpr, this.inspectedPixel);
     }
   }
@@ -247,41 +257,57 @@ export class ColorTestModule implements TestModule {
     dpr: number,
     data: { x: number; y: number; r: number; g: number; b: number; hex: string }
   ): void {
-    // วาดเป้าเล็งที่ตำแหน่งพิกเซล
-    ctx.strokeStyle = data.r + data.g + data.b > 380 ? "#000000" : "#ffffff";
-    ctx.lineWidth = Math.max(1, Math.round(1.5 * dpr));
-    const targetR = Math.round(16 * dpr);
+    const isBright = data.r * 0.299 + data.g * 0.587 + data.b * 0.114 > 140;
+    const strokeColor = isBright ? "#09090b" : "#ffffff";
+    const accentColor = "#38bdf8";
+
+    // วาด Reticle เป้าเล็งแบบเว้นจุดกึ่งกลาง (Center Gap) เพื่อไม่บดบังพิกเซลเป้าหมาย
+    const outerR = Math.round(18 * dpr);
+    const innerGap = Math.round(5 * dpr);
+    const tickLen = Math.round(8 * dpr);
+
+    ctx.save();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = Math.max(1.5, Math.round(2 * dpr));
     ctx.beginPath();
-    ctx.arc(data.x, data.y, targetR, 0, Math.PI * 2);
-    ctx.moveTo(data.x - targetR - 6, data.y);
-    ctx.lineTo(data.x + targetR + 6, data.y);
-    ctx.moveTo(data.x, data.y - targetR - 6);
-    ctx.lineTo(data.x, data.y + targetR + 6);
+    ctx.arc(data.x, data.y, outerR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ขีดบอกตำแหน่ง 4 ทิศ (เว้นกึ่งกลาง)
+    ctx.beginPath();
+    ctx.moveTo(data.x - outerR - tickLen, data.y);
+    ctx.lineTo(data.x - innerGap, data.y);
+    ctx.moveTo(data.x + innerGap, data.y);
+    ctx.lineTo(data.x + outerR + tickLen, data.y);
+    ctx.moveTo(data.x, data.y - outerR - tickLen);
+    ctx.lineTo(data.x, data.y - innerGap);
+    ctx.moveTo(data.x, data.y + innerGap);
+    ctx.lineTo(data.x, data.y + outerR + tickLen);
     ctx.stroke();
 
     // กล่องแสดงค่าสีด้านล่างซ้าย
-    const cardW = Math.round(280 * dpr);
-    const cardH = Math.round(110 * dpr);
+    const cardW = Math.round(320 * dpr);
+    const cardH = Math.round(124 * dpr);
     const cardX = Math.round(20 * dpr);
     const cardY = h - cardH - Math.round(20 * dpr);
 
-    ctx.fillStyle = "rgba(10, 10, 10, 0.92)";
-    ctx.strokeStyle = "#525252";
+    ctx.fillStyle = "rgba(10, 10, 10, 0.94)";
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 1;
     ctx.fillRect(cardX, cardY, cardW, cardH);
     ctx.strokeRect(cardX, cardY, cardW, cardH);
 
-    // ช่องแสดงสีตัวอย่าง
-    const swatchSize = Math.round(44 * dpr);
-    const swatchX = cardX + Math.round(16 * dpr);
-    const swatchY = cardY + Math.round(20 * dpr);
+    // ช่องแสดงสีตัวอย่าง (Color Swatch)
+    const swatchSize = Math.round(48 * dpr);
+    const swatchX = cardX + Math.round(14 * dpr);
+    const swatchY = cardY + Math.round(16 * dpr);
     ctx.fillStyle = `rgb(${data.r},${data.g},${data.b})`;
     ctx.fillRect(swatchX, swatchY, swatchSize, swatchSize);
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = isBright ? "#27272a" : "#ffffff";
     ctx.strokeRect(swatchX, swatchY, swatchSize, swatchSize);
 
-    // ข้อความค่าสี
-    const textX = swatchX + swatchSize + Math.round(16 * dpr);
+    // ข้อมูลตัวเลขค่าสี
+    const textX = swatchX + swatchSize + Math.round(14 * dpr);
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
@@ -290,16 +316,23 @@ export class ColorTestModule implements TestModule {
     ctx.fillText(`HEX: ${data.hex}`, textX, swatchY);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = `${Math.round(12 * dpr)}px monospace`;
-    ctx.fillText(`RGB: (${data.r}, ${data.g}, ${data.b})`, textX, swatchY + Math.round(20 * dpr));
+    ctx.font = `bold ${Math.round(12 * dpr)}px monospace`;
+    ctx.fillText(`RGB: (${data.r}, ${data.g}, ${data.b})`, textX, swatchY + Math.round(18 * dpr));
 
-    ctx.fillStyle = "#a3a3a3";
+    ctx.fillStyle = "#a1a1aa";
     ctx.font = `${Math.round(11 * dpr)}px monospace`;
-    ctx.fillText(`Pos: (${data.x}, ${data.y}) px`, textX, swatchY + Math.round(38 * dpr));
+    ctx.fillText(`พิกัดพิกเซลจริง: (${data.x}, ${data.y}) px`, textX, swatchY + Math.round(36 * dpr));
 
-    ctx.fillStyle = "#eab308";
-    ctx.font = `${Math.round(10 * dpr)}px sans-serif`;
-    ctx.fillText("กด D เพื่อปิดโหมดตรวจสี | แตะ/คลิกเพื่อย้ายเป้า", cardX + Math.round(16 * dpr), cardY + cardH - Math.round(22 * dpr));
+    // ข้อความชี้แจงตามข้อกำหนดขั้นตอนที่ 3 ในแผน v2
+    ctx.fillStyle = "#facc15";
+    ctx.font = `${Math.round(9.5 * dpr)}px sans-serif`;
+    ctx.fillText("ค่าสีจาก Buffer ของ Canvas (ก่อนผ่าน Color Profile ของจอ)", cardX + Math.round(14 * dpr), cardY + cardH - Math.round(34 * dpr));
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = `${Math.round(9 * dpr)}px sans-serif`;
+    ctx.fillText("กด D เพื่อเปิด/ปิดโหมดตรวจสี | แตะหรือคลิกเพื่อเล็งพิกเซล", cardX + Math.round(14 * dpr), cardY + cardH - Math.round(18 * dpr));
+
+    ctx.restore();
   }
 
   // -------------------------------------------------------------

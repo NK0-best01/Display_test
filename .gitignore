@@ -20,7 +20,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
-
-# Scratch
 scratch/
