@@ -1,4 +1,4 @@
-                        # บันทึกการทำงาน (Work Log) — โปรเจกต์ระบบทดสอบจอภาพ (Display Tester)
+# บันทึกการทำงาน (Work Log) — โปรเจกต์ระบบทดสอบจอภาพ (Display Tester)
 
 เอกสารนี้เก็บประวัติและรายละเอียดการทำงานในแต่ละ Part ตามแผน [display-tester-plan.md](file:///d:/Ai/โปรเจค_roboq/display_test/plan/display-tester-plan.md)
 
@@ -55,8 +55,8 @@
 ---
 
 ## Part 3: ทดสอบคุณภาพของภาพ (Image Quality)
-- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
-- **Branch**: `feat/part-3-image-quality` (แตกสาขาจาก `feat/part-2-app-shell`)
+- **สถานะ**: อัปโหลดขึ้น GitHub แล้ว (ยังไม่ merge เข้า `dev` ตามคำสั่งผู้ใช้)
+- **Branch**: `feat/part-3-image-quality` (Push ไปที่ `origin/feat/part-3-image-quality` เรียบร้อย)
 - **สิ่งที่ดำเนินการ**:
   1. สร้างโมดูลทดสอบจริง [`image-quality.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/image-quality.ts) สำหรับหัวข้อ "คุณภาพของภาพ (Image Quality)"
   2. ออกแบบภาพทดสอบครบทั้ง 6 หมวดหลัก (7 รูปแบบย่อย) แบบ Pixel-Perfect:
@@ -75,3 +75,40 @@
 - **ผลการทดสอบ (Verification Results)**:
   - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-mPDVtD-z.js` 64.59 kB)
   - รันชุดตรวจรับอัตโนมัติ Part 3: **PASS 100% ทุกหัวข้อ** (ทั้ง 7 รูปแบบ, Pixel-Perfect Image Data, การควบคุมคีย์บอร์ด/ทัช และจำลองการวาดบน scale 100%, 125%, 150%, 200%)
+
+---
+
+## Part 4: ทดสอบสี (Color)
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-4-color` (แตกสาขาจาก `feat/part-3-image-quality`)
+- **สิ่งที่ดำเนินการ**:
+  1. สร้างโมดูลทดสอบจริง [`color.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/color.ts) สำหรับหัวข้อ "ทดสอบสี (Color Accuracy & Gradient)"
+  2. ออกแบบภาพทดสอบครบทั้ง 5 หมวดหลักตามข้อกำหนด (รวมเป็น 12 รูปแบบย่อย):
+     - **หมวดที่ 1 (สีเต็มจอ 8 สี)**:
+       - 1. แดง (Red: #FF0000 / rgb(255, 0, 0))
+       - 2. เขียว (Green: #00FF00 / rgb(0, 255, 0))
+       - 3. น้ำเงิน (Blue: #0000FF / rgb(0, 0, 255))
+       - 4. ขาว (White: #FFFFFF / rgb(255, 255, 255))
+       - 5. ดำ (Black: #000000 / rgb(0, 0, 0))
+       - 6. ฟ้าอมเขียว (Cyan: #00FFFF / rgb(0, 255, 255))
+       - 7. ม่วงแดง (Magenta: #FF00FF / rgb(255, 0, 255))
+       - 8. เหลือง (Yellow: #FFFF00 / rgb(255, 255, 0))
+     - **หมวดที่ 2 (Color Bars)**:
+       - 9. แถบสีมาตรฐาน SMPTE และ 8 Color Bars พร้อมแถบ Cast Bars และแท่ง PLUGE Pulses (-2%, 0%, +2% black)
+     - **หมวดที่ 3 (Gradient แยกช่องสี & สีผสม)**:
+       - 10. แถบ Gradient แยก 5 ชั้น: Red (0-255), Green (0-255), Blue (0-255), Cyan/Magenta/Yellow Blend และ Full Spectrum Rainbow
+     - **หมวดที่ 4 (ช่องสีเทียบธรรมชาติ)**:
+       - 11. ช่องสีเทียบอ้างอิง ColorChecker สำหรับดูด้วยสายตา: สีผิวคน 4 โทน (Fair, Medium/Tan, Deep Tan, Dark), สีท้องฟ้า/น้ำ 4 โทน, สีใบไม้/ดิน/หินธรรมชาติ 4 โทน
+     - **หมวดที่ 5 (White & Gray Tint ตรวจสีเพี้ยน)**:
+       - 12. แบ่ง 4 โซนบน-ล่าง: ขาวบริสุทธิ์ 100% (255), เทาสว่าง 75% (191), เทากลาง 50% (128), เทาเข้ม 25% (64)
+  3. พัฒนาระบบ **Debug Color Inspector / Pixel Picker**:
+     - กดปุ่ม `D` เพื่อเปิด/ปิดโหมดตรวจสี
+     - ใช้ฟังก์ชัน `readPixelAt(x, y)` อ่านค่าพิกเซลตรงจาก Canvas ผ่าน `ctx.getImageData()`
+     - แสดงการ์ดแสดงค่า HEX, RGB, พิกัดตำแหน่งพิกเซล และตัวอย่างสีจริงสด ๆ บนหน้าจอ
+  4. เชื่อมโยงโมดูลผ่าน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts) ให้หัวข้อที่ 1 และ 3 ทำงานด้วยคลาสจริง
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-CTdojBz5.js` 79.81 kB)
+  - รันชุดตรวจรับอัตโนมัติ Part 4 (`scratch/verify-part4.mjs`): **PASS 100% ทุกรายการ**
+    - ตรวจสอบค่าสีดิบ RGB ครบทุกสีตรงตามนิยาม 100% (Red, Green, Blue, White, Black, Cyan, Magenta, Yellow, 100%, 75%, 50%, 25% Gray)
+    - ตรวจสอบระบบ `readPixelAt` ผ่าน `getImageData`
+    - ตรวจสอบว่า Canvas ปลอดจาก filter, shadow, opacity, transition อย่างเด็ดขาด
