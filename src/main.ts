@@ -1,7 +1,7 @@
 import "./style.css";
 import { lockWebViewInteractions } from "./core/fullscreen";
 import { AppRouter } from "./core/router";
-import { createTestModules } from "./tests/placeholder";
+import { getAllTestModules } from "./tests/index";
 
 // ปิด Context Menu, การลากเลือกข้อความ, และการซูม
 lockWebViewInteractions();
@@ -13,7 +13,7 @@ if (!appRoot) {
 
 let routerRef: AppRouter | null = null;
 
-const modules = createTestModules((subStatus) => {
+const modules = getAllTestModules((subStatus) => {
   routerRef?.updateHudSubStatus(subStatus);
 });
 

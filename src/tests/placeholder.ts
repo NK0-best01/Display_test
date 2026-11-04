@@ -225,7 +225,7 @@ export class PlaceholderTestModule implements TestModule {
   }
 }
 
-export function createTestModules(
+export function createPlaceholderModules(
   onStatusChange?: (status: string) => void
 ): TestModule[] {
   const specs: PlaceholderSpec[] = [
@@ -315,4 +315,6 @@ export function createTestModules(
 
   return specs.map((spec) => new PlaceholderTestModule(spec, onStatusChange));
 }
+
+export const createTestModules = createPlaceholderModules;
 

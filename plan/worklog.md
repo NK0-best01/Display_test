@@ -1,4 +1,4 @@
-# บันทึกการทำงาน (Work Log) — โปรเจกต์ระบบทดสอบจอภาพ (Display Tester)
+                        # บันทึกการทำงาน (Work Log) — โปรเจกต์ระบบทดสอบจอภาพ (Display Tester)
 
 เอกสารนี้เก็บประวัติและรายละเอียดการทำงานในแต่ละ Part ตามแผน [display-tester-plan.md](file:///d:/Ai/โปรเจค_roboq/display_test/plan/display-tester-plan.md)
 
@@ -38,8 +38,8 @@
 ---
 
 ## Part 2: โครงหลักของแอป (App Shell)
-- **สถานะ**: พัฒนาและทดสอบเสร็จแล้ว รอผู้ใช้ยืนยันก่อน commit/merge
-- **Branch**: `feat/part-2-app-shell`
+- **สถานะ**: อัปโหลดขึ้น GitHub แล้ว (ยังไม่ merge เข้า `dev` ตามคำสั่งผู้ใช้)
+- **Branch**: `feat/part-2-app-shell` (Push ไปที่ `origin/feat/part-2-app-shell` เรียบร้อย)
 - **สิ่งที่ดำเนินการ**:
   1. กำหนดอินเทอร์เฟซมาตรฐาน [`TestModule`](file:///d:/Ai/โปรเจค_roboq/display_test/src/core/types.ts) มีเมธอด `start(canvas, ctx)`, `stop()`, `onKey(e)`, `onPointer(e)` และ `onResize(canvas, ctx)`
   2. สร้างตัวรวบรวมข้อมูลจอภาพและระบบ [`display-info.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/core/display-info.ts) แสดงความละเอียดจริง (Physical Resolution), `devicePixelRatio`, ชื่อ Monitor, `navigator.maxTouchPoints`, และ OS พร้อมฟังก์ชัน `syncCanvasPhysicalSize` ให้ `<canvas>` มีขนาดเท่าพิกเซลจริงเสมอ
@@ -50,4 +50,28 @@
   7. สร้างโมดูลทดสอบจำลอง (Placeholder) ครบทั้ง 7 หัวข้อใน [`placeholder.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/placeholder.ts) เพื่อทดสอบการเข้า-ออกและการควบคุมทั้งหมด
 - **ผลการทดสอบ (Verification Results)**:
   - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-COaluXhU.js` 50.52 kB)
-  - ตรวจสอบเกณฑ์ตรวจรับ Part 1 & Part 2 อัตโนมัติ (17 รายการ + จำลองสลับเข้า-ออกหน้าทดสอบ 50 ครั้ง): **PASS ทั้งหมด 100%** (Listener ค้าง = 0, RAF ค้าง = 0)
+  - ตรวจสอบเกณฑ์ตรวจรับ Part 1 & Part 2 อัตโนมัติ: **PASS ทั้งหมด 100%** (Listener ค้าง = 0, RAF ค้าง = 0)
+
+---
+
+## Part 3: ทดสอบคุณภาพของภาพ (Image Quality)
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ รอผู้ใช้ตรวจสอบและยืนยันก่อนอัปโหลดขึ้น GitHub
+- **Branch**: `feat/part-3-image-quality` (แตกสาขาจาก `feat/part-2-app-shell`)
+- **สิ่งที่ดำเนินการ**:
+  1. สร้างโมดูลทดสอบจริง [`image-quality.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/image-quality.ts) สำหรับหัวข้อ "คุณภาพของภาพ (Image Quality)"
+  2. ออกแบบภาพทดสอบครบทั้ง 6 หมวดหลัก (7 รูปแบบย่อย) แบบ Pixel-Perfect:
+     - **รูปแบบที่ 1 (Ramp Smooth)**: Grayscale ramp ต่อเนื่องแนวนอน 0-255 และแถบย้อนกลับ 255-0 เพื่อตรวจดู Banding
+     - **รูปแบบที่ 2 (Ramp Stepped)**: Grayscale แบบขั้นบันได 16 ระดับ และ 32 ระดับ เพื่อตรวจการแยกแยะระดับสีเทา
+     - **รูปแบบที่ 3 (Near-Black & Near-White)**: กล่องสี่เหลี่ยมระดับ 0-15 (พื้นดำ) และระดับ 240-255 (พื้นขาว) เพื่อตรวจ Dark clipping และ Highlight clipping
+     - **รูปแบบที่ 4 (Gamma Calibration)**: ลายเส้นขาวดำสลับทีละ 1 พิกเซลจริง (1px black / 1px white ทางกายภาพ) เทียบกับบล็อกสีเทาทึบค่า Gamma ต่าง ๆ (1.8, 2.0, 2.2, 2.4, 2.6)
+     - **รูปแบบที่ 5 (Sharpness 1px)**: เส้น 1px แนวนอน, เส้น 1px แนวตั้ง, ตารางหมากรุก 1x1 พิกเซล (วาดผ่าน `createImageData` แบบไม่ติด anti-aliasing) และบล็อกทดสอบ Micro-text ภาษาไทย/อังกฤษ (ขนาด 7px - 16px)
+     - **รูปแบบที่ 6 (Geometry & Aspect Ratio)**: ตาราง Grid ละเอียดพร้อมวงกลมสมบูรณ์กลางจอ และวงกลม 4 มุมจอ สำหรับตรวจการบิดเบี้ยวและสัดส่วนพิกเซล 1:1
+     - **รูปแบบที่ 7 (Overscan & Edge)**: กรอบเส้น 1px ที่ขอบสุดของจอ (เส้นสีเขียว 0px, เส้นสีแดง 1px), เส้นมาร์ก 1%, 2%, 3%, 5% จากขอบจอ และลูกศรชี้ขอบจอทั้ง 4 ทิศ เพื่อตรวจดูขอบจอถูกตัดทิ้ง
+  3. เชื่อมโยงโมดูลผ่าน [`index.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/index.ts) ให้หัวข้อที่ 1 ใช้งานคลาสจริง และหัวข้อที่เหลือยังคงเรียก Placeholder ได้อย่างราบรื่น
+  4. รองรับการควบคุมสลับภาพทดสอบ:
+     - คีย์บอร์ด: ลูกศร `←` / `→`, `Space`, `PageUp` / `PageDown`, `Home` (ภาพแรก), `End` (ภาพสุดท้าย)
+     - สัมผัส / เมาส์: ปัดซ้าย/ขวา (Swipe > 40px) หรือแตะครึ่งซ้ายจอ (ย้อนกลับ) / แตะครึ่งขวาจอ (ถัดไป)
+     - HUD แสดงลำดับภาพ ชื่อรูปแบบ และคำแนะนำว่าต้องสังเกตอะไรในแต่ละภาพ
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่าน ไม่มี Type Error (`dist/assets/index-mPDVtD-z.js` 64.59 kB)
+  - รันชุดตรวจรับอัตโนมัติ Part 3: **PASS 100% ทุกหัวข้อ** (ทั้ง 7 รูปแบบ, Pixel-Perfect Image Data, การควบคุมคีย์บอร์ด/ทัช และจำลองการวาดบน scale 100%, 125%, 150%, 200%)
