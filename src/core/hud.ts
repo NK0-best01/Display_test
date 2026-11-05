@@ -23,7 +23,7 @@ export class HudController {
     this.onBackTrigger = onBackTrigger;
 
     this.container = document.createElement("div");
-    this.container.className = "fixed inset-0 pointer-events-none z-40";
+    this.container.className = "fixed inset-0 pointer-events-none z-40 overflow-hidden";
 
     // โซน индикаเตอร์มุมซ้ายบน (แสดงความคืบหน้าเมื่อกดค้างเพื่อกลับเมนู)
     this.cornerIndicator = document.createElement("div");
@@ -45,23 +45,23 @@ export class HudController {
     this.pillBtn.id = "hud-floating-pill";
     this.pillBtn.className =
       "fixed top-3 right-3 px-4 py-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-800 active:bg-neutral-700 border border-neutral-700 text-xs font-semibold text-neutral-200 pointer-events-auto select-none shadow-lg transition-all hidden";
-    this.pillBtn.innerHTML = "☰ แสดงแผงควบคุม / เมนู";
+    this.pillBtn.innerHTML = "แสดงแผงควบคุม / เมนู";
     this.pillBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
     this.pillBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       this.setVisible(true);
     });
 
-    // กล่อง HUD มุมขวาบน (เพื่อไม่ทับกับโซนกดค้างมุมซ้ายบน)
+    // กล่อง HUD มุมขวาบน (ป้องกันข้อความยาวดันจนล้นขอบจอ)
     this.hudBox = document.createElement("div");
     this.hudBox.className =
-      "fixed top-3 right-3 max-w-xs md:max-w-sm bg-neutral-900/90 border border-neutral-700 text-neutral-100 rounded-xl p-3 pointer-events-auto select-none";
+      "fixed top-3 right-3 max-w-[calc(100vw-1.5rem)] sm:max-w-md md:max-w-lg bg-neutral-900/95 border border-neutral-700 text-neutral-100 rounded-xl p-3 pointer-events-auto select-none shadow-2xl";
 
     this.hudBox.innerHTML = `
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h3 id="hud-title" class="font-bold text-sm md:text-base text-white leading-tight"></h3>
-          <p id="hud-status" class="text-xs text-emerald-400 font-mono mt-0.5"></p>
+      <div class="flex items-start justify-between gap-3 min-w-0">
+        <div class="min-w-0 flex-1 pr-1">
+          <h3 id="hud-title" class="font-bold text-sm md:text-base text-white leading-tight truncate"></h3>
+          <p id="hud-status" class="text-xs text-emerald-400 font-mono mt-0.5 break-all"></p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <button
@@ -76,13 +76,13 @@ export class HudController {
             id="hud-btn-back"
             type="button"
             title="กลับเมนูหลัก (Esc)"
-            class="px-3 py-2 rounded-lg bg-red-700 hover:bg-red-600 active:bg-red-800 text-xs font-semibold text-white cursor-pointer min-h-[38px] transition-colors shadow-sm"
+            class="px-3 py-2 rounded-lg bg-red-700 hover:bg-red-600 active:bg-red-800 text-xs font-semibold text-white cursor-pointer min-h-[38px] transition-colors shadow-sm shrink-0"
           >
             เมนู (Esc)
           </button>
         </div>
       </div>
-      <div id="hud-hint" class="text-xs text-neutral-300 mt-2 pt-2 border-t border-neutral-800 leading-relaxed"></div>
+      <div id="hud-hint" class="text-xs text-neutral-300 mt-2 pt-2 border-t border-neutral-800 leading-relaxed break-words"></div>
     `;
 
     this.titleEl = this.hudBox.querySelector("#hud-title") as HTMLElement;

@@ -591,7 +591,7 @@ export class MultiTouchTestModule implements TestModule {
     ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🔄 รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
+    ctx.fillText("รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawDrawMode(
@@ -652,7 +652,7 @@ export class MultiTouchTestModule implements TestModule {
     ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🗑️ ล้างเส้นวาด (C)", btnX + btnW / 2, btnY + btnH / 2);
+    ctx.fillText("ล้างเส้นวาด (C)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawGridMode(
@@ -732,7 +732,7 @@ export class MultiTouchTestModule implements TestModule {
     ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🔄 ล้างตาราง (R)", btnX + btnW / 2, btnY + btnH / 2);
+    ctx.fillText("ล้างตาราง (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawSubModeNavBar(

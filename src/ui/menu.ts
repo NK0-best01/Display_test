@@ -27,47 +27,39 @@ export const BADGE_COLORS: Record<TestModuleId, string> = {
  */
 const MODULE_METADATA: Record<
   TestModuleId,
-  { category: string; enTitle: string; icon: string }
+  { category: string; enTitle: string }
 > = {
   "image-quality": {
     category: "PANEL OPTICS",
     enTitle: "Geometry, Sharpness & SMPTE Bars",
-    icon: "📐",
   },
   "multi-touch": {
     category: "DIGITIZER",
     enTitle: "Multi-Touch Coordinates & Grid Matrix",
-    icon: "👆",
   },
   "color": {
     category: "COLOR UNIFORMITY",
     enTitle: "Solid Color Purity & Real-time RGB Inspector",
-    icon: "🎨",
   },
   "dead-pixel": {
     category: "DEFECT DETECTION",
     enTitle: "Subpixel Stuck & Dead Pixel Verification",
-    icon: "🔍",
   },
   "light-bleed": {
     category: "BACKLIGHT MURA",
     enTitle: "5×5 Zone Backlight Bleed & Uniformity",
-    icon: "💡",
   },
   "touch-axis": {
     category: "COORDINATE LINEARITY",
     enTitle: "XY Crosshair Alignment & Edge Accuracy",
-    icon: "🎯",
   },
   "touch-latency": {
     category: "RESPONSE TIME",
     enTitle: "Digitizer Sampling Rate & Input Lag",
-    icon: "⚡",
   },
   "video": {
     category: "MOTION PLAYBACK",
     enTitle: "Dynamic Range, Frame Pacing & Audio Sync",
-    icon: "🎬",
   },
 };
 
@@ -129,7 +121,7 @@ export async function renderMainMenu(
             </div>
 
             <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/25 text-emerald-300">
-              <span class="text-[10px] font-mono font-medium">🔒 เต็มจอ (LOCKED FULLSCREEN)</span>
+              <span class="text-[10px] font-mono font-medium">เต็มจอ (LOCKED FULLSCREEN)</span>
             </div>
 
           </div>
@@ -143,7 +135,7 @@ export async function renderMainMenu(
             class="touch-btn h-11 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:scale-[0.96] border border-white/[0.1] text-xs sm:text-sm font-semibold text-zinc-200 transition-all duration-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] cursor-pointer"
             title="ดูข้อมูลฮาร์ดแวร์และจอภาพ (ปุ่มลัด I)"
           >
-            <span class="mr-1.5 text-cyan-400">ℹ️</span> ข้อมูลจอภาพ (Info)
+            ข้อมูลจอภาพ (Info)
           </button>
 
           <!-- ปุ่มปิดโปรแกรม (แทนที่ปุ่มขยาย/ย่อเดิม ตามข้อกำหนด ให้ย่อไม่ได้ หากจะออกให้เป็นปุ่มออกเอา) -->
@@ -153,7 +145,7 @@ export async function renderMainMenu(
             class="touch-btn h-11 px-4 rounded-xl bg-red-950/60 hover:bg-red-900/80 active:scale-[0.96] border border-red-500/35 text-xs sm:text-sm font-semibold text-red-200 hover:text-white transition-all duration-150 shadow-sm cursor-pointer"
             title="ปิดโปรแกรม (Exit)"
           >
-            <span class="mr-1.5 text-red-400 font-bold">⏻</span> ปิดโปรแกรม (Exit)
+            ปิดโปรแกรม (Exit)
           </button>
 
           <!-- Compatibility Element: ซ่อนไว้เพื่อความเข้ากันได้กับโค้ด/สคริปต์ตรวจรับในอดีต -->
@@ -169,7 +161,6 @@ export async function renderMainMenu(
               const meta = MODULE_METADATA[m.id] ?? {
                 category: "DIAGNOSTIC",
                 enTitle: "Module",
-                icon: "📊",
               };
               const padIdx = String(idx + 1).padStart(2, "0");
 
@@ -262,8 +253,8 @@ export async function renderMainMenu(
       >
         <div class="bg-[#12141c] border border-red-500/30 rounded-2xl max-w-md w-full p-6 text-zinc-100 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/40 flex items-center justify-center text-red-400 text-xl font-bold">
-              ⏻
+            <div class="w-10 h-10 rounded-xl bg-red-950/80 border border-red-500/40 flex items-center justify-center text-red-400 text-xs font-mono font-bold">
+              EXIT
             </div>
             <div>
               <h3 class="text-lg font-bold text-white">ต้องการปิดโปรแกรม?</h3>
@@ -288,7 +279,7 @@ export async function renderMainMenu(
               type="button"
               class="touch-btn h-11 px-5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.96] text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition-all cursor-pointer"
             >
-              ⏻ ยืนยันปิดโปรแกรม (Exit)
+              ยืนยันปิดโปรแกรม (Exit)
             </button>
           </div>
         </div>

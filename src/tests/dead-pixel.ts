@@ -428,7 +428,7 @@ export class DeadPixelTestModule implements TestModule {
       bounds.btnY,
       bounds.magW,
       bounds.btnH,
-      this.magnifierEnabled ? `🔍 แว่น ${this.zoomLevel}x: ON` : `🔍 แว่นขยาย (M)`,
+      this.magnifierEnabled ? `แว่น ${this.zoomLevel}x: ON` : `แว่นขยาย (M)`,
       this.magnifierEnabled
     );
     drawBtn(
@@ -436,7 +436,7 @@ export class DeadPixelTestModule implements TestModule {
       bounds.btnY,
       bounds.clrW,
       bounds.btnH,
-      `🗑️ ล้างจุด (${this.defectMarkers.length})`
+      `ล้างจุด (${this.defectMarkers.length})`
     );
     drawBtn(bounds.nextX, bounds.btnY, bounds.nextW, bounds.btnH, "สีถัดไป ▶");
   }

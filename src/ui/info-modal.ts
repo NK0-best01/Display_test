@@ -36,7 +36,7 @@ export async function renderInfoModal(
           type="button"
           class="touch-btn h-10 px-4 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 active:scale-[0.96] border border-white/[0.1] text-xs font-semibold text-zinc-200 transition-all cursor-pointer shadow-sm"
         >
-          ✕ ปิด (Esc)
+          ปิด (Esc)
         </button>
       </div>
 

@@ -319,7 +319,7 @@ export class ColorTestModule implements TestModule {
       btnY,
       centerBtnW,
       btnH,
-      this.debugInspectorActive ? "🔍 ตรวจ RGB: เปิดอยู่" : "🔍 ตรวจ RGB (D)",
+      this.debugInspectorActive ? "ตรวจ RGB: เปิดอยู่" : "ตรวจ RGB (D)",
       this.debugInspectorActive
     );
     drawBtn(nextX, btnY, btnW, btnH, "สีถัดไป ▶");

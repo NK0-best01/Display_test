@@ -544,6 +544,7 @@ export class TouchLatencyTestModule implements TestModule {
     ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("🔄 รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
+    // รองรับการตรวจสอบ: 🔄 รีเซ็ตสถิติ (R)
+    ctx.fillText("รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 }

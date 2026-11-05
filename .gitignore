@@ -25,3 +25,4 @@ scratch/
 # Videos
 videos/*
 !videos/.gitkeep
+src-tauri/videos/
