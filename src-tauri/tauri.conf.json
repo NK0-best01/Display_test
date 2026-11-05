@@ -19,7 +19,7 @@
         "height": 768,
         "fullscreen": true,
         "decorations": false,
-        "resizable": true
+        "resizable": false
       }
     ],
     "security": {

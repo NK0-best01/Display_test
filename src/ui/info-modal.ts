@@ -1,7 +1,8 @@
-﻿import { collectDisplayInfo } from "../core/display-info";
+import { collectDisplayInfo } from "../core/display-info";
 
 /**
- * หน้าต่างแสดงข้อมูลจอภาพและระบบ (Info View)
+ * หน้าต่างแสดงข้อมูลจอภาพและระบบ (System & Display Info Modal)
+ * สไตล์ Calibrated Hardware Spec Sheet (Non-AI, Crafted & Precise)
  */
 export async function renderInfoModal(
   container: HTMLElement,
@@ -11,82 +12,126 @@ export async function renderInfoModal(
 
   const overlay = document.createElement("div");
   overlay.className =
-    "fixed inset-0 z-50 bg-neutral-950/95 flex items-center justify-center p-4 md:p-6 overflow-y-auto";
+    "fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 md:p-6 overflow-y-auto select-none";
 
   overlay.innerHTML = `
-    <div class="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-3xl w-full p-5 md:p-6 text-neutral-100 space-y-5">
-      <div class="flex items-center justify-between border-b border-neutral-800 pb-4">
-        <div>
-          <h2 class="text-xl md:text-2xl font-bold text-white">ข้อมูลจอภาพและระบบ (System & Display Info)</h2>
-          <p class="text-xs md:text-sm text-neutral-400 mt-0.5">ตรวจสอบค่าความละเอียดจริง อัตราการขยาย และความสามารถของจอสัมผัส</p>
+    <div class="relative bg-[#0f1118] border border-white/[0.1] rounded-2xl max-w-3xl w-full p-5 sm:p-6 text-zinc-100 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between border-b border-white/[0.08] pb-4">
+        <div class="space-y-1">
+          <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-950/70 border border-cyan-500/30 text-[10px] font-mono font-bold tracking-wider text-cyan-300 uppercase">
+            HARDWARE TELEMETRY
+          </div>
+          <h2 class="text-lg sm:text-2xl font-bold tracking-tight text-white">
+            ข้อมูลจอภาพและสเปกฮาร์ดแวร์
+          </h2>
+          <p class="text-xs sm:text-sm text-zinc-400">
+            รายละเอียดความละเอียดฟิสิคัล, อัตราขยาย DPI, ดิจิไทเซอร์ และสภาพแวดล้อมรันไทม์
+          </p>
         </div>
+
         <button
           id="btn-close-info"
           type="button"
-          class="touch-btn px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-sm font-semibold text-white"
+          class="touch-btn h-10 px-4 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 active:scale-[0.96] border border-white/[0.1] text-xs font-semibold text-zinc-200 transition-all cursor-pointer shadow-sm"
         >
-          ปิดหน้าต่าง (Esc)
+          ✕ ปิด (Esc)
         </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm md:text-base">
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">ความละเอียดจริงของจอ (Physical Resolution)</div>
-          <div class="text-lg font-mono font-bold text-emerald-400 mt-1">
-            ${info.physicalWidth} × ${info.physicalHeight} พิกเซล
+      <!-- Telemetry Spec Matrix (2 Columns) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            ความละเอียดจริงระดับพิกเซล (Physical Resolution)
+          </div>
+          <div class="text-lg sm:text-xl font-mono font-bold text-emerald-400">
+            ${info.physicalWidth} × ${info.physicalHeight} px
+          </div>
+          <div class="text-[11px] text-zinc-400">
+            Native Hardware Backing Store (100% 1:1 Pixel Mapping)
           </div>
         </div>
 
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">ขนาดพื้นที่แสดงผล CSS (Viewport)</div>
-          <div class="text-lg font-mono font-bold text-blue-400 mt-1">
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            ขนาดพื้นที่แสดงผล CSS (Viewport Logic)
+          </div>
+          <div class="text-lg sm:text-xl font-mono font-bold text-cyan-400">
             ${info.cssWidth} × ${info.cssHeight} px
           </div>
-        </div>
-
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">อัตราส่วนพิกเซล (devicePixelRatio / Scale)</div>
-          <div class="text-lg font-mono font-bold text-amber-400 mt-1">
-            DPR ${info.devicePixelRatio} (Monitor Scale: ${info.monitorScaleFactor})
+          <div class="text-[11px] text-zinc-400">
+            ความละเอียดที่ระบบเรนเดอร์คำนวณในหน่วย CSS Pixels
           </div>
         </div>
 
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">จำนวนจุดสัมผัสสูงสุด (navigator.maxTouchPoints)</div>
-          <div class="text-lg font-mono font-bold text-purple-400 mt-1">
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            อัตราส่วนพิกเซล (devicePixelRatio / Monitor Scale)
+          </div>
+          <div class="text-lg sm:text-xl font-mono font-bold text-amber-300">
+            ${info.devicePixelRatio}x
+          </div>
+          <div class="text-[11px] text-zinc-400">
+            Monitor Scale Factor: ${info.monitorScaleFactor}
+          </div>
+        </div>
+
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            จำนวนจุดสัมผัสดิจิไทเซอร์ (Max Touch Points)
+          </div>
+          <div class="text-lg sm:text-xl font-mono font-bold text-cyan-300">
             ${info.maxTouchPoints} จุดพร้อมกัน
           </div>
+          <div class="text-[11px] text-zinc-400">
+            ตรวจจับผ่าน W3C Pointer & Touch API
+          </div>
         </div>
 
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">ชื่อจอภาพ (Monitor Name)</div>
-          <div class="text-base font-mono font-medium text-neutral-200 mt-1 break-all">
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            ชื่ออุปกรณ์แสดงผล (Monitor Device Name)
+          </div>
+          <div class="text-sm sm:text-base font-mono font-medium text-zinc-200 break-all">
             ${info.monitorName}
           </div>
         </div>
 
-        <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5">
-          <div class="text-xs text-neutral-400">ระบบปฏิบัติการ (Operating System)</div>
-          <div class="text-base font-mono font-medium text-neutral-200 mt-1">
-            ${info.osPlatform} (${info.colorDepth}-bit color)
+        <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3.5 space-y-1">
+          <div class="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+            แพลตฟอร์มและบิตสี (OS Platform & Color Depth)
           </div>
+          <div class="text-sm sm:text-base font-mono font-medium text-zinc-200">
+            ${info.osPlatform} (${info.colorDepth}-bit Framebuffer)
+          </div>
+        </div>
+
+      </div>
+
+      <!-- User Agent Footprint -->
+      <div class="bg-[#141722] border border-white/[0.07] rounded-xl p-3 text-xs space-y-1 text-zinc-400">
+        <div class="font-mono text-[10px] uppercase font-semibold text-zinc-300">
+          User Agent / WebView Runtime Footprint:
+        </div>
+        <div class="font-mono text-[11px] text-zinc-400 break-all leading-relaxed">
+          ${info.userAgent}
         </div>
       </div>
 
-      <div class="bg-neutral-950 border border-neutral-800 rounded-xl p-3.5 text-xs text-neutral-400 space-y-1">
-        <div class="font-semibold text-neutral-300">ข้อมูล User Agent ของ WebView:</div>
-        <div class="font-mono break-all">${info.userAgent}</div>
-      </div>
-
-      <div class="flex justify-end pt-1">
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end pt-2 border-t border-white/[0.08]">
         <button
           id="btn-close-info-bottom"
           type="button"
-          class="touch-btn px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 font-semibold text-white"
+          class="touch-btn h-11 px-6 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:scale-[0.96] font-semibold text-white transition-all cursor-pointer shadow-lg shadow-cyan-950/40"
         >
-          ตกลง / กลับเมนูหลัก
+          รับทราบ / กลับสู่เมนูหลัก (OK)
         </button>
       </div>
+
     </div>
   `;
 
@@ -103,4 +148,3 @@ export async function renderInfoModal(
 
   container.appendChild(overlay);
 }
-

@@ -1,7 +1,7 @@
 import type { TestModule, TestModuleId } from "./types";
 import { HudController } from "./hud";
 import { syncCanvasPhysicalSize } from "./display-info";
-import { setFullscreenState, toggleFullscreen } from "./fullscreen";
+import { toggleFullscreen, exitApp } from "./fullscreen";
 import { renderMainMenu } from "../ui/menu";
 import { renderInfoModal } from "../ui/info-modal";
 import { normalizeKey } from "./keys";
@@ -67,6 +67,9 @@ export class AppRouter {
     await renderMainMenu(this.root, this.moduleList, {
       onSelectTest: (id) => this.startTest(id),
       onOpenInfo: () => this.openInfo(),
+      onExitApp: () => {
+        void exitApp();
+      },
     });
   }
 
@@ -232,11 +235,10 @@ export class AppRouter {
       return;
     }
 
-    // หากอยู่ในหน้าเมนูหลัก: กด Esc ออกจาก Fullscreen, กด 1-8 เข้าหัวข้อทดสอบ, กด I เปิด Info
+    // หากอยู่ในหน้าเมนูหลัก: กด Esc ออกจากโปรแกรม (Exit), กด 1-8 เข้าหัวข้อทดสอบ, กด I เปิด Info
     if (k === "Escape") {
       e.preventDefault();
-      await setFullscreenState(false);
-      await this.showMenu();
+      await exitApp();
       return;
     }
 

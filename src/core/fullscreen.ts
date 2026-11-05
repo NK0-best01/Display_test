@@ -1,4 +1,5 @@
-﻿import { getCurrentWindow, currentMonitor, type Monitor } from "@tauri-apps/api/window";
+import { getCurrentWindow, currentMonitor, type Monitor } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * ตรวจสอบว่ารันอยู่ใน Tauri WebView หรือไม่
@@ -8,28 +9,32 @@ export function isTauri(): boolean {
 }
 
 /**
- * สลับสถานะ Fullscreen (F11 หรือปุ่มในเมนู)
+ * ออกจากโปรแกรม (Exit Application)
+ * ปิดหน้าต่างและคืนทรัพยากรทั้งหมด
  */
-export async function toggleFullscreen(): Promise<boolean> {
+export async function exitApp(): Promise<void> {
   if (isTauri()) {
     try {
-      const appWindow = getCurrentWindow();
-      const current = await appWindow.isFullscreen();
-      await appWindow.setFullscreen(!current);
-      return !current;
-    } catch (err) {
-      console.error("Failed to toggle Tauri fullscreen:", err);
+      await invoke("exit_app");
+      return;
+    } catch {
+      try {
+        await getCurrentWindow().close();
+        return;
+      } catch (err) {
+        console.error("Failed to exit Tauri app:", err);
+      }
     }
   }
+  // Browser fallback
+  window.close();
+}
 
-  // Fallback สำหรับการเปิดผ่านเบราว์เซอร์ปกติตอน dev
-  if (!document.fullscreenElement) {
-    await document.documentElement.requestFullscreen().catch(() => {});
-    return true;
-  } else {
-    await document.exitFullscreen().catch(() => {});
-    return false;
-  }
+/**
+ * บังคับสถานะเต็มจอเสมอ (Locked Fullscreen - ไม่สามารถย่อหน้าต่างได้ตามข้อกำหนด)
+ */
+export async function toggleFullscreen(): Promise<boolean> {
+  return await setFullscreenState(true);
 }
 
 /**
