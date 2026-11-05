@@ -50,6 +50,10 @@ export class VideoTestModule implements TestModule {
   // UI สำหรับหน้ารายการ
   private listOverlayElement: HTMLDivElement | null = null;
 
+  // แถบควบคุมสัมผัสขณะเล่นวิดีโอ
+  private playbackControlsEl: HTMLDivElement | null = null;
+  private playbackControlsHideTimeout: number | null = null;
+
   constructor(onStatusChange?: (status: string) => void) {
     this.onStatusChange = onStatusChange;
   }
@@ -181,17 +185,7 @@ export class VideoTestModule implements TestModule {
 
   public onPointer(e: PointerEvent): void {
     if (this.state === "playing" && e.type === "pointerdown") {
-      const w = window.innerWidth;
-      const x = e.clientX;
-
-      // สัมผัส 1/3 ทางซ้าย: ก่อนหน้า, 1/3 ทางขวา: ถัดไป, ตรงกลาง: เล่น/หยุด
-      if (x < w * 0.33) {
-        this.playPreviousVideo();
-      } else if (x > w * 0.67) {
-        this.playNextVideo();
-      } else {
-        this.togglePlayPause();
-      }
+      this.renderPlaybackControls();
     }
   }
 
@@ -261,6 +255,7 @@ export class VideoTestModule implements TestModule {
 
     this.container?.appendChild(video);
     this.videoElement = video;
+    this.renderPlaybackControls();
 
     try {
       await video.play();
@@ -434,6 +429,7 @@ export class VideoTestModule implements TestModule {
 
   private cleanupPlayback(): void {
     this.stopStatusUpdater();
+    this.cleanupPlaybackControls();
     const errOverlay = document.getElementById("video-error-overlay");
     if (errOverlay) errOverlay.remove();
 
@@ -444,6 +440,109 @@ export class VideoTestModule implements TestModule {
       this.videoElement.remove();
       this.videoElement = null;
     }
+  }
+
+  private renderPlaybackControls(): void {
+    this.cleanupPlaybackControls();
+    if (!this.container) return;
+
+    const ctrl = document.createElement("div");
+    ctrl.id = "video-playback-controls";
+    ctrl.className =
+      "absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 p-2.5 rounded-2xl bg-neutral-950/90 border border-neutral-700/80 shadow-2xl backdrop-blur-sm select-none pointer-events-auto transition-opacity duration-200";
+
+    const isPaused = this.videoElement?.paused ?? false;
+
+    ctrl.innerHTML = `
+      <button id="vctrl-prev" type="button" class="touch-btn px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-white">
+        ⏮️ ก่อนหน้า
+      </button>
+      <button id="vctrl-play" type="button" class="touch-btn px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-xs font-bold text-white shadow-md">
+        ${isPaused ? "▶ เล่น" : "⏸ พัก"}
+      </button>
+      <button id="vctrl-next" type="button" class="touch-btn px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-white">
+        ⏭️ ถัดไป
+      </button>
+      <button id="vctrl-aspect" type="button" class="touch-btn px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-neutral-200">
+        📐 ${ASPECT_MODE_LABELS[this.aspectMode]}
+      </button>
+      <button id="vctrl-loop" type="button" class="touch-btn px-3 py-2 rounded-xl ${
+        this.isLooping ? "bg-emerald-600/80 text-white" : "bg-neutral-800 text-neutral-300"
+      } hover:bg-neutral-700 text-xs font-semibold">
+        🔁 ${this.isLooping ? "วนซ้ำ: ON" : "วนซ้ำ: OFF"}
+      </button>
+      <button id="vctrl-mute" type="button" class="touch-btn px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-neutral-200">
+        ${this.isMuted ? "🔇 ปิดเสียง" : "🔊 เปิดเสียง"}
+      </button>
+      <button id="vctrl-back" type="button" class="touch-btn px-3.5 py-2 rounded-xl bg-red-700/90 hover:bg-red-600 active:bg-red-800 text-xs font-bold text-white shadow-md">
+        📋 หน้ารายการ (Esc)
+      </button>
+    `;
+
+    ctrl.addEventListener("pointerdown", (e) => e.stopPropagation());
+
+    ctrl.querySelector("#vctrl-prev")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.playPreviousVideo();
+    });
+
+    ctrl.querySelector("#vctrl-play")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.togglePlayPause();
+      this.renderPlaybackControls();
+    });
+
+    ctrl.querySelector("#vctrl-next")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.playNextVideo();
+    });
+
+    ctrl.querySelector("#vctrl-aspect")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.cycleAspectMode();
+      this.renderPlaybackControls();
+    });
+
+    ctrl.querySelector("#vctrl-loop")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleLoop();
+      this.renderPlaybackControls();
+    });
+
+    ctrl.querySelector("#vctrl-mute")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleMute();
+      this.renderPlaybackControls();
+    });
+
+    ctrl.querySelector("#vctrl-back")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.stopVideoAndBackToList();
+    });
+
+    this.container.appendChild(ctrl);
+    this.playbackControlsEl = ctrl;
+    this.scheduleAutoHideControls();
+  }
+
+  private cleanupPlaybackControls(): void {
+    if (this.playbackControlsHideTimeout !== null) {
+      clearTimeout(this.playbackControlsHideTimeout);
+      this.playbackControlsHideTimeout = null;
+    }
+    if (this.playbackControlsEl) {
+      this.playbackControlsEl.remove();
+      this.playbackControlsEl = null;
+    }
+  }
+
+  private scheduleAutoHideControls(): void {
+    if (this.playbackControlsHideTimeout !== null) {
+      clearTimeout(this.playbackControlsHideTimeout);
+    }
+    this.playbackControlsHideTimeout = window.setTimeout(() => {
+      this.cleanupPlaybackControls();
+    }, 3500);
   }
 
   private cleanupListUi(): void {

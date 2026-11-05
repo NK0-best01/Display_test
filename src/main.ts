@@ -1,4 +1,4 @@
-import "./style.css";
+﻿import "./style.css";
 import { lockWebViewInteractions } from "./core/fullscreen";
 import { AppRouter } from "./core/router";
 import { getAllTestModules } from "./tests/index";

@@ -1,4 +1,4 @@
-import type { TestModule } from "../core/types";
+﻿import type { TestModule } from "../core/types";
 import { ImageQualityTestModule } from "./image-quality";
 import { MultiTouchTestModule } from "./multi-touch";
 import { ColorTestModule } from "./color";

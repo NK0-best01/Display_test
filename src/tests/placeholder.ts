@@ -1,4 +1,4 @@
-import type { TestModule, TestModuleId } from "../core/types";
+﻿import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
 import { normalizeKey } from "../core/keys";
 

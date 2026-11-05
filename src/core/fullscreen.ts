@@ -1,4 +1,4 @@
-import { getCurrentWindow, currentMonitor, type Monitor } from "@tauri-apps/api/window";
+﻿import { getCurrentWindow, currentMonitor, type Monitor } from "@tauri-apps/api/window";
 
 /**
  * ตรวจสอบว่ารันอยู่ใน Tauri WebView หรือไม่

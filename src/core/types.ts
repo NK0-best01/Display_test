@@ -1,4 +1,4 @@
-export type TestModuleId =
+﻿export type TestModuleId =
   | "image-quality"
   | "multi-touch"
   | "color"

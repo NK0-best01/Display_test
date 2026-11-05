@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 type LightBleedModeId =
   | "black-0"
@@ -142,43 +143,115 @@ export class LightBleedTestModule implements TestModule {
 
   public onKey(e: KeyboardEvent): void {
     this.wakeUi();
+    const k = normalizeKey(e);
+    if (!k) return;
 
-    if (e.key === "ArrowRight" || e.key === "PageDown") {
+    if (k === "ArrowRight" || k === "PageDown") {
       e.preventDefault();
       this.nextPreset();
-    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+    } else if (k === "ArrowLeft" || k === "PageUp") {
       e.preventDefault();
       this.prevPreset();
-    } else if (e.key === "ArrowUp" || e.key === "+" || e.key === "=") {
+    } else if (k === "ArrowUp" || k === "+" || k === "=") {
       // เพิ่มระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(1);
-    } else if (e.key === "ArrowDown" || e.key === "-" || e.key === "_") {
+    } else if (k === "ArrowDown" || k === "-" || k === "_") {
       // ลดระดับสีเทาทีละ 1/255
       e.preventDefault();
       this.adjustGrayBy(-1);
-    } else if (e.code === "KeyG" || e.key === "g" || e.key === "G" || e.key === "เ") {
+    } else if (k === "g") {
       e.preventDefault();
       this.toggleGridMode();
-    } else if (e.key === "Home") {
+    } else if (k === "Home") {
       e.preventDefault();
       this.setGrayValue(0);
-    } else if (e.key === "End") {
+    } else if (k === "End") {
       e.preventDefault();
       this.setGrayValue(255);
     }
+  }
+
+  private getControlsLayout(w: number, h: number, dpr: number) {
+    const sliderW = Math.min(w - Math.round(60 * dpr), Math.round(620 * dpr));
+    const sliderH = Math.round(18 * dpr);
+    const sliderX = (w - sliderW) / 2;
+    const sliderY = h - sliderH - Math.round(22 * dpr);
+
+    const btnH = Math.round(42 * dpr);
+    // เว้นระยะห่างจากแถบสไลเดอร์และตัวเลข 0/255 อย่างน้อย 30px เพื่อไม่ให้ชิดเกินไป
+    const btnY = sliderY - btnH - Math.round(30 * dpr);
+
+    const prevW = Math.round(130 * dpr);
+    const adjW = Math.round(60 * dpr);
+    const gridW = Math.round(160 * dpr);
+    const nextW = Math.round(130 * dpr);
+    const gap = Math.round(12 * dpr);
+    const totalW = prevW + adjW * 2 + gridW + nextW + gap * 4;
+    const startX = Math.round((w - totalW) / 2);
+
+    return {
+      sliderW,
+      sliderH,
+      sliderX,
+      sliderY,
+      btnH,
+      btnY,
+      prevX: startX,
+      prevW,
+      minusX: startX + prevW + gap,
+      minusW: adjW,
+      gridX: startX + prevW + gap + adjW + gap,
+      gridW,
+      plusX: startX + prevW + gap + adjW + gap + gridW + gap,
+      plusW: adjW,
+      nextX: startX + prevW + gap + adjW + gap + gridW + gap + adjW + gap,
+      nextW,
+    };
   }
 
   public onPointer(e: PointerEvent): void {
     this.wakeUi();
     if (!this.canvas) return;
 
+    const dpr = window.devicePixelRatio || 1;
+    const physX = Math.round(e.clientX * dpr);
+    const physY = Math.round(e.clientY * dpr);
+
     if (e.type === "pointerdown") {
+      const layout = this.getControlsLayout(this.canvas.width, this.canvas.height, dpr);
+      const hitPadding = Math.round(6 * dpr);
+
+      // ตรวจสอบการกดปุ่มสัมผัสควบคุม
+      if (physY >= layout.btnY - hitPadding && physY <= layout.btnY + layout.btnH + hitPadding) {
+        if (physX >= layout.prevX - hitPadding && physX <= layout.prevX + layout.prevW + hitPadding) {
+          this.prevPreset();
+          return;
+        }
+        if (physX >= layout.minusX - hitPadding && physX <= layout.minusX + layout.minusW + hitPadding) {
+          this.adjustGrayBy(-5);
+          return;
+        }
+        if (physX >= layout.gridX - hitPadding && physX <= layout.gridX + layout.gridW + hitPadding) {
+          this.toggleGridMode();
+          return;
+        }
+        if (physX >= layout.plusX - hitPadding && physX <= layout.plusX + layout.plusW + hitPadding) {
+          this.adjustGrayBy(5);
+          return;
+        }
+        if (physX >= layout.nextX - hitPadding && physX <= layout.nextX + layout.nextW + hitPadding) {
+          this.nextPreset();
+          return;
+        }
+      }
+
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
 
-      // ตรวจสอบว่าแตะบริเวณแถบสไลเดอร์ด้านล่างหรือไม่ (20% ด้านล่างของจอ)
-      if (e.clientY > window.innerHeight * 0.8) {
+      // ตรวจสอบการลากสไลเดอร์: ดักจับเฉพาะแถบสไลเดอร์ +/- 16px
+      const sliderMargin = Math.round(16 * dpr);
+      if (physY >= layout.sliderY - sliderMargin && physY <= layout.sliderY + layout.sliderH + sliderMargin) {
         this.isDraggingSlider = true;
         this.updateGrayFromPointerX(e.clientX);
       }
@@ -428,33 +501,59 @@ export class LightBleedTestModule implements TestModule {
       bannerY + Math.round(52 * dpr)
     );
 
-    // สไลเดอร์ปรับค่าสีเทา 0 - 255 ด้านล่าง
-    const sliderW = Math.min(w - Math.round(60 * dpr), Math.round(620 * dpr));
-    const sliderH = Math.round(20 * dpr);
-    const sliderX = (w - sliderW) / 2;
-    const sliderY = h - sliderH - Math.round(30 * dpr);
+    // โครงสร้างเลย์เอาต์สไลเดอร์และปุ่มควบคุมด้านล่าง (เว้นระยะห่างไม่อัดแน่น)
+    const layout = this.getControlsLayout(w, h, dpr);
 
     // รางสไลเดอร์
-    const grad = ctx.createLinearGradient(sliderX, 0, sliderX + sliderW, 0);
+    const grad = ctx.createLinearGradient(layout.sliderX, 0, layout.sliderX + layout.sliderW, 0);
     grad.addColorStop(0, "#000000");
     grad.addColorStop(1, "#ffffff");
     ctx.fillStyle = grad;
-    ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
+    ctx.fillRect(layout.sliderX, layout.sliderY, layout.sliderW, layout.sliderH);
     ctx.strokeStyle = "#525252";
     ctx.lineWidth = 1;
-    ctx.strokeRect(sliderX, sliderY, sliderW, sliderH);
+    ctx.strokeRect(layout.sliderX, layout.sliderY, layout.sliderW, layout.sliderH);
 
     // ปุ่มจับ (Thumb)
-    const thumbX = sliderX + (gray / 255) * sliderW;
+    const thumbX = layout.sliderX + (gray / 255) * layout.sliderW;
     ctx.fillStyle = "#38bdf8";
-    ctx.fillRect(thumbX - Math.round(6 * dpr), sliderY - Math.round(4 * dpr), Math.round(12 * dpr), sliderH + Math.round(8 * dpr));
+    ctx.fillRect(thumbX - Math.round(6 * dpr), layout.sliderY - Math.round(4 * dpr), Math.round(12 * dpr), layout.sliderH + Math.round(8 * dpr));
     ctx.strokeStyle = "#ffffff";
-    ctx.strokeRect(thumbX - Math.round(6 * dpr), sliderY - Math.round(4 * dpr), Math.round(12 * dpr), sliderH + Math.round(8 * dpr));
+    ctx.strokeRect(thumbX - Math.round(6 * dpr), layout.sliderY - Math.round(4 * dpr), Math.round(12 * dpr), layout.sliderH + Math.round(8 * dpr));
 
-    // ป้ายบอกค่าที่ตัวเลื่อน
-    ctx.fillStyle = "#ffffff";
+    // ป้ายบอกค่าที่ตัวเลื่อน (วางเหนือสไลเดอร์ในช่องว่างระหว่างปุ่มกับสไลเดอร์ ไม่ทับกับปุ่ม)
+    ctx.fillStyle = "#38bdf8";
     ctx.font = `bold ${Math.round(11 * dpr)}px monospace`;
     ctx.textAlign = "center";
-    ctx.fillText(`${gray}/255`, thumbX, sliderY - Math.round(10 * dpr));
+    ctx.fillText(`${gray}/255`, thumbX, layout.sliderY - Math.round(10 * dpr));
+
+    // แถบปุ่มสัมผัสควบคุม (วางอยู่เหนือสไลเดอร์และตัวเลข โดยเว้นระยะห่างสบายตา)
+    const drawBtn = (x: number, y: number, bw: number, bh: number, label: string, active = false) => {
+      ctx.fillStyle = active ? "#0284c7" : "rgba(24, 24, 27, 0.9)";
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = active ? "#38bdf8" : "#3f3f46";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, bw, bh);
+
+      ctx.fillStyle = active ? "#ffffff" : "#d4d4d8";
+      ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + bw / 2, y + bh / 2);
+    };
+
+    drawBtn(layout.prevX, layout.btnY, layout.prevW, layout.btnH, "◀ ก่อนหน้า");
+    drawBtn(layout.minusX, layout.btnY, layout.minusW, layout.btnH, "-5");
+    const isGridActive = curPreset?.isGrid ?? false;
+    drawBtn(
+      layout.gridX,
+      layout.btnY,
+      layout.gridW,
+      layout.btnH,
+      isGridActive ? "ตาราง 5×5: เปิด" : "ตาราง 5×5 (G)",
+      isGridActive
+    );
+    drawBtn(layout.plusX, layout.btnY, layout.plusW, layout.btnH, "+5");
+    drawBtn(layout.nextX, layout.btnY, layout.nextW, layout.btnH, "ถัดไป ▶");
   }
 }

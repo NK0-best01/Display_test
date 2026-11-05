@@ -1,4 +1,4 @@
-import type { TestModule, TestModuleId } from "../core/types";
+﻿import type { TestModule, TestModuleId } from "../core/types";
 import { collectDisplayInfo } from "../core/display-info";
 import { getFullscreenState, toggleFullscreen } from "../core/fullscreen";
 

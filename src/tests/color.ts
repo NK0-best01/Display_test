@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 interface ColorPatternItem {
   id: string;
@@ -62,31 +63,45 @@ export class ColorTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
+    const k = normalizeKey(e);
+    if (!k) return;
+
     if (
-      e.key === "ArrowRight" ||
-      e.key === " " ||
-      e.code === "Space" ||
-      e.key === "PageDown"
+      k === "ArrowRight" ||
+      k === " " ||
+      k === "Space" ||
+      k === "PageDown"
     ) {
       e.preventDefault();
       this.nextPattern();
-    } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+    } else if (k === "ArrowLeft" || k === "PageUp") {
       e.preventDefault();
       this.prevPattern();
-    } else if (e.key === "Home") {
+    } else if (k === "Home") {
       e.preventDefault();
       this.currentIndex = 0;
       this.emitStatus();
       this.scheduleDraw();
-    } else if (e.key === "End") {
+    } else if (k === "End") {
       e.preventDefault();
       this.currentIndex = this.patterns.length - 1;
       this.emitStatus();
       this.scheduleDraw();
-    } else if (e.code === "KeyD" || e.key === "d" || e.key === "D" || e.key === "ก" || e.key === "ด") {
+    } else if (k === "d" || e.code === "KeyD" || e.key === "d" || e.key === "D" || e.key === "ก" || e.key === "ด") {
       e.preventDefault();
       this.toggleDebugInspector();
     }
+  }
+
+  private getTouchToolbarBounds(w: number, h: number, dpr: number) {
+    const btnW = Math.round(140 * dpr);
+    const centerBtnW = Math.round(180 * dpr);
+    const btnH = Math.round(44 * dpr);
+    const btnY = h - btnH - Math.round(14 * dpr);
+    const prevX = Math.round(20 * dpr);
+    const centerX = Math.round((w - centerBtnW) / 2);
+    const nextX = w - btnW - Math.round(20 * dpr);
+    return { btnW, centerBtnW, btnH, btnY, prevX, centerX, nextX };
   }
 
   public onPointer(e: PointerEvent): void {
@@ -95,6 +110,34 @@ export class ColorTestModule implements TestModule {
     if (e.type === "pointerdown") {
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
+
+      const dpr = window.devicePixelRatio || 1;
+      const physX = Math.round(e.clientX * dpr);
+      const physY = Math.round(e.clientY * dpr);
+      const { btnW, centerBtnW, btnH, btnY, prevX, centerX, nextX } = this.getTouchToolbarBounds(
+        this.canvas.width,
+        this.canvas.height,
+        dpr
+      );
+
+      const hitPadding = Math.round(6 * dpr);
+      if (physY >= btnY - hitPadding && physY <= btnY + btnH + hitPadding) {
+        if (physX >= prevX - hitPadding && physX <= prevX + btnW + hitPadding) {
+          this.pointerStartX = null;
+          this.prevPattern();
+          return;
+        }
+        if (physX >= centerX - hitPadding && physX <= centerX + centerBtnW + hitPadding) {
+          this.pointerStartX = null;
+          this.toggleDebugInspector();
+          return;
+        }
+        if (physX >= nextX - hitPadding && physX <= nextX + btnW + hitPadding) {
+          this.pointerStartX = null;
+          this.nextPattern();
+          return;
+        }
+      }
 
       if (this.debugInspectorActive && this.canvas) {
         this.updateTargetPosFromPointer(e.clientX, e.clientY);
@@ -248,6 +291,38 @@ export class ColorTestModule implements TestModule {
       // วาด Overlay แสดงค่าสีและเป้าเล็งทับลงไปหลังจากอ่านค่าเสร็จแล้วเท่านั้น
       this.drawDebugOverlay(this.ctx, width, height, dpr, this.inspectedPixel);
     }
+
+    // วาดแถบปุ่มสัมผัสด้านล่างจอ (รองรับการใช้นิ้วกด 100%)
+    this.drawTouchToolbar(this.ctx, width, height, dpr);
+  }
+
+  private drawTouchToolbar(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number): void {
+    const { btnW, centerBtnW, btnH, btnY, prevX, centerX, nextX } = this.getTouchToolbarBounds(w, h, dpr);
+
+    const drawBtn = (x: number, y: number, bw: number, bh: number, label: string, active = false) => {
+      ctx.fillStyle = active ? "#0284c7" : "rgba(24, 24, 27, 0.88)";
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = active ? "#38bdf8" : "#3f3f46";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, bw, bh);
+
+      ctx.fillStyle = active ? "#ffffff" : "#d4d4d8";
+      ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + bw / 2, y + bh / 2);
+    };
+
+    drawBtn(prevX, btnY, btnW, btnH, "◀ สีก่อนหน้า");
+    drawBtn(
+      centerX,
+      btnY,
+      centerBtnW,
+      btnH,
+      this.debugInspectorActive ? "🔍 ตรวจ RGB: เปิดอยู่" : "🔍 ตรวจ RGB (D)",
+      this.debugInspectorActive
+    );
+    drawBtn(nextX, btnY, btnW, btnH, "สีถัดไป ▶");
   }
 
   private drawDebugOverlay(
@@ -285,11 +360,17 @@ export class ColorTestModule implements TestModule {
     ctx.lineTo(data.x, data.y + outerR + tickLen);
     ctx.stroke();
 
-    // กล่องแสดงค่าสีด้านล่างซ้าย
-    const cardW = Math.round(320 * dpr);
+    // กล่องแสดงค่าสีด้านล่างซ้าย (วางเหนือแถบปุ่มสัมผัสล่างจอ ไม่ให้ทับซ้อนกัน)
+    const cardW = Math.round(330 * dpr);
     const cardH = Math.round(124 * dpr);
     const cardX = Math.round(20 * dpr);
-    const cardY = h - cardH - Math.round(20 * dpr);
+    const { btnY } = this.getTouchToolbarBounds(_w, h, dpr);
+    let cardY = btnY - cardH - Math.round(12 * dpr);
+
+    // หากเป้าเล็งอยู่บริเวณล่างซ้าย ให้สลับการ์ดไปไว้ด้านบนซ้ายเพื่อไม่ให้บังเป้าเล็ง
+    if (data.y >= cardY - Math.round(20 * dpr) && data.x <= cardX + cardW + Math.round(20 * dpr)) {
+      cardY = Math.round(64 * dpr);
+    }
 
     ctx.fillStyle = "rgba(10, 10, 10, 0.94)";
     ctx.strokeStyle = accentColor;

@@ -10,6 +10,7 @@ export interface HudUpdatePayload {
 export class HudController {
   private container: HTMLDivElement;
   private hudBox: HTMLDivElement;
+  private pillBtn: HTMLButtonElement;
   private titleEl: HTMLElement;
   private statusEl: HTMLElement;
   private hintEl: HTMLElement;
@@ -27,16 +28,29 @@ export class HudController {
     // โซน индикаเตอร์มุมซ้ายบน (แสดงความคืบหน้าเมื่อกดค้างเพื่อกลับเมนู)
     this.cornerIndicator = document.createElement("div");
     this.cornerIndicator.className =
-      "fixed top-0 left-0 w-24 h-24 pointer-events-none flex flex-col items-start justify-start p-2 opacity-0 transition-opacity duration-150";
+      "fixed top-0 left-0 w-28 h-28 pointer-events-none flex flex-col items-start justify-start p-2 opacity-0 transition-opacity duration-150";
     this.cornerIndicator.innerHTML = `
-      <div class="bg-neutral-900/90 border border-neutral-700 text-white text-xs px-2.5 py-1.5 rounded-lg">
-        <div>ค้างไว้เพื่อกลับเมนู...</div>
-        <div class="w-full bg-neutral-700 h-1.5 rounded mt-1 overflow-hidden">
-          <div id="hud-corner-bar" class="bg-amber-400 h-full w-0"></div>
+      <div class="bg-neutral-900/95 border border-neutral-700 text-white text-xs px-3 py-2 rounded-xl shadow-lg">
+        <div class="font-medium">แตะค้างเพื่อกลับเมนู...</div>
+        <div class="w-full bg-neutral-700 h-2 rounded-full mt-1.5 overflow-hidden">
+          <div id="hud-corner-bar" class="bg-amber-400 h-full w-0 transition-all"></div>
         </div>
       </div>
     `;
     this.cornerProgressEl = this.cornerIndicator.querySelector("#hud-corner-bar") as HTMLDivElement;
+
+    // ปุ่มลอยเมื่อซ่อน HUD เพื่อให้ใช้นิ้วแตะเรียกกลับมาได้เสมอ ไม่ต้องพึ่งคีย์บอร์ด
+    this.pillBtn = document.createElement("button");
+    this.pillBtn.type = "button";
+    this.pillBtn.id = "hud-floating-pill";
+    this.pillBtn.className =
+      "fixed top-3 right-3 px-4 py-2.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-800 active:bg-neutral-700 border border-neutral-700 text-xs font-semibold text-neutral-200 pointer-events-auto select-none shadow-lg transition-all hidden";
+    this.pillBtn.innerHTML = "☰ แสดงแผงควบคุม / เมนู";
+    this.pillBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+    this.pillBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.setVisible(true);
+    });
 
     // กล่อง HUD มุมขวาบน (เพื่อไม่ทับกับโซนกดค้างมุมซ้ายบน)
     this.hudBox = document.createElement("div");
@@ -49,12 +63,12 @@ export class HudController {
           <h3 id="hud-title" class="font-bold text-sm md:text-base text-white leading-tight"></h3>
           <p id="hud-status" class="text-xs text-emerald-400 font-mono mt-0.5"></p>
         </div>
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex items-center gap-2 shrink-0">
           <button
             id="hud-btn-hide"
             type="button"
             title="ซ่อน HUD (ปุ่ม H หรือแตะ 3 นิ้ว)"
-            class="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-medium text-neutral-200 cursor-pointer"
+            class="px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-neutral-200 cursor-pointer min-h-[38px] transition-colors"
           >
             ซ่อน (H)
           </button>
@@ -62,7 +76,7 @@ export class HudController {
             id="hud-btn-back"
             type="button"
             title="กลับเมนูหลัก (Esc)"
-            class="px-2.5 py-1.5 rounded-lg bg-red-700 hover:bg-red-600 active:bg-red-800 text-xs font-medium text-white cursor-pointer"
+            class="px-3 py-2 rounded-lg bg-red-700 hover:bg-red-600 active:bg-red-800 text-xs font-semibold text-white cursor-pointer min-h-[38px] transition-colors shadow-sm"
           >
             เมนู (Esc)
           </button>
@@ -95,6 +109,7 @@ export class HudController {
     });
 
     this.container.appendChild(this.cornerIndicator);
+    this.container.appendChild(this.pillBtn);
     this.container.appendChild(this.hudBox);
     parent.appendChild(this.container);
   }
@@ -119,6 +134,11 @@ export class HudController {
   public setVisible(visible: boolean): void {
     this.visible = visible;
     this.hudBox.style.display = visible ? "block" : "none";
+    if (visible) {
+      this.pillBtn.classList.add("hidden");
+    } else {
+      this.pillBtn.classList.remove("hidden");
+    }
   }
 
   public isVisible(): boolean {
@@ -145,4 +165,3 @@ export class HudController {
     this.container.remove();
   }
 }
-

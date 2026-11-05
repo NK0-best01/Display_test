@@ -1,4 +1,4 @@
-import { getMonitorInfo, isTauri } from "./fullscreen";
+﻿import { getMonitorInfo, isTauri } from "./fullscreen";
 
 export interface DisplayInfoSnapshot {
   cssWidth: number;

@@ -107,7 +107,24 @@ export class TouchLatencyTestModule implements TestModule {
     this.currentPointerX = Math.round(e.clientX * dpr);
     this.currentPointerY = Math.round(e.clientY * dpr);
 
-    if (e.type === "pointerdown" || e.type === "pointermove") {
+    if (e.type === "pointerdown") {
+      const btnW = Math.round(180 * dpr);
+      const btnH = Math.round(44 * dpr);
+      const btnX = this.canvas.width - btnW - Math.round(20 * dpr);
+      const btnY = this.canvas.height - btnH - Math.round(10 * dpr);
+
+      if (
+        this.currentPointerX >= btnX &&
+        this.currentPointerX <= btnX + btnW &&
+        this.currentPointerY >= btnY &&
+        this.currentPointerY <= btnY + btnH
+      ) {
+        this.resetStats();
+        return;
+      }
+
+      this.isPointerActive = true;
+    } else if (e.type === "pointermove") {
       this.isPointerActive = true;
     } else if (e.type === "pointerup" || e.type === "pointercancel") {
       this.isPointerActive = false;
@@ -511,8 +528,22 @@ export class TouchLatencyTestModule implements TestModule {
       h - Math.round(24 * dpr)
     );
 
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = `${Math.round(10 * dpr)}px sans-serif`;
-    ctx.fillText("กด R เพื่อรีเซ็ตสถิติบัฟเฟอร์ 200 ตัวอย่าง", w - Math.round(140 * dpr), h - Math.round(24 * dpr));
+    // ปุ่มรีเซ็ตสถิติแบบสัมผัสได้
+    const btnW = Math.round(180 * dpr);
+    const btnH = Math.round(40 * dpr);
+    const btnX = w - btnW - Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(10 * dpr);
+
+    ctx.fillStyle = "rgba(39, 39, 42, 0.9)";
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = "#52525b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🔄 รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 }

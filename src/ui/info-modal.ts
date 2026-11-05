@@ -1,4 +1,4 @@
-import { collectDisplayInfo } from "../core/display-info";
+﻿import { collectDisplayInfo } from "../core/display-info";
 
 /**
  * หน้าต่างแสดงข้อมูลจอภาพและระบบ (Info View)

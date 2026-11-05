@@ -36,6 +36,7 @@ export class AppRouter {
   private boundPointerMove: (e: PointerEvent) => void;
   private boundPointerUp: (e: PointerEvent) => void;
   private boundTouchStartFallback: (e: TouchEvent) => void;
+  private boundTouchEndFallback: (e: TouchEvent) => void;
 
   constructor(root: HTMLElement, modules: TestModule[]) {
     this.root = root;
@@ -50,6 +51,7 @@ export class AppRouter {
     this.boundPointerMove = (e) => this.handleTestPointer(e);
     this.boundPointerUp = (e) => this.handleTestPointer(e);
     this.boundTouchStartFallback = (e) => this.handleTouchThreeFingerFallback(e);
+    this.boundTouchEndFallback = (e) => this.handleTouchEndFallback(e);
 
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("resize", this.boundResize);
@@ -119,6 +121,12 @@ export class AppRouter {
       passive: false,
     });
 
+    // ฟัง pointerup / pointercancel บน window ด้วย เพื่อดักจับกรณีผู้ใช้ปล่อยนิ้วนอก Canvas หรือเหนือ HUD
+    window.addEventListener("pointerup", this.boundPointerUp);
+    window.addEventListener("pointercancel", this.boundPointerUp);
+    window.addEventListener("touchend", this.boundTouchEndFallback);
+    window.addEventListener("touchcancel", this.boundTouchEndFallback);
+
     // เริ่มการทำงานของโมดูลทดสอบ
     mod.start(canvas, ctx);
   }
@@ -148,6 +156,11 @@ export class AppRouter {
     this.cancelCornerHold();
     this.activePointers.clear();
     this.threeFingerTriggered = false;
+
+    window.removeEventListener("pointerup", this.boundPointerUp);
+    window.removeEventListener("pointercancel", this.boundPointerUp);
+    window.removeEventListener("touchend", this.boundTouchEndFallback);
+    window.removeEventListener("touchcancel", this.boundTouchEndFallback);
 
     if (this.activeModule) {
       this.activeModule.stop();
@@ -249,10 +262,13 @@ export class AppRouter {
 
     if (e.type === "pointerdown") {
       this.activePointers.add(e.pointerId);
-      try {
-        this.canvas?.setPointerCapture(e.pointerId);
-      } catch {
-        // บางเคสของเมาส์หรือสังเคราะห์ Event อาจไม่รองรับ pointer capture
+      // หลีกเลี่ยง setPointerCapture บนสัมผัส (Touch) เพราะบน Windows DirectManipulation มักทำให้เหตุการณ์นิ้วที่ 2 หลุด
+      if (e.pointerType !== "touch") {
+        try {
+          this.canvas?.setPointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
       }
 
       // เช็คการแตะ 3 นิ้วพร้อมกันเพื่อสลับ HUD
@@ -272,7 +288,13 @@ export class AppRouter {
         this.cancelCornerHold();
       }
     } else if (e.type === "pointermove") {
-      if (this.cornerHoldPointerId === e.pointerId) {
+      // ตรวจจับกรณีเมาส์ปล่อยปุ่มไปแล้วแต่ไม่ได้รับ pointerup
+      if (e.pointerType === "mouse" && e.buttons === 0 && this.activePointers.has(e.pointerId)) {
+        this.activePointers.delete(e.pointerId);
+        if (this.cornerHoldPointerId === e.pointerId) {
+          this.cancelCornerHold();
+        }
+      } else if (this.cornerHoldPointerId === e.pointerId) {
         if (e.clientX > CORNER_ZONE_PX || e.clientY > CORNER_ZONE_PX) {
           this.cancelCornerHold();
         }
@@ -298,6 +320,23 @@ export class AppRouter {
     if (e.touches.length === 3 && !this.threeFingerTriggered) {
       this.threeFingerTriggered = true;
       this.hud?.toggle();
+    }
+  }
+
+  /**
+   * Fallback สำหรับตรวจจับเมื่อยกนิ้วทั้งหมดออกจากหน้าจอ
+   */
+  private handleTouchEndFallback(e: TouchEvent): void {
+    if (e.touches.length === 0) {
+      this.activePointers.clear();
+      this.threeFingerTriggered = false;
+      this.cancelCornerHold();
+
+      // สั่งให้โมดูลล้าง active pointers ถ้าโมดูลรองรับ
+      const anyMod = this.activeModule as unknown as { clearActivePointers?: () => void };
+      if (typeof anyMod?.clearActivePointers === "function") {
+        anyMod.clearActivePointers();
+      }
     }
   }
 
@@ -352,4 +391,3 @@ export class AppRouter {
     return this.hud?.isVisible() ?? false;
   }
 }
-

@@ -1,5 +1,6 @@
 import type { TestModule, TestModuleId } from "../core/types";
 import { syncCanvasPhysicalSize } from "../core/display-info";
+import { normalizeKey } from "../core/keys";
 
 export type OrientationPatternId =
   | "normal"
@@ -224,26 +225,26 @@ export class TouchAxisTestModule implements TestModule {
   }
 
   public onKey(e: KeyboardEvent): void {
-    const isR = e.code === "KeyR" || e.key === "r" || e.key === "R" || e.key === "พ";
-    const isC = e.code === "KeyC" || e.key === "c" || e.key === "C" || e.key === "แ";
-    const is1 = e.code === "Digit1" || e.code === "Numpad1" || e.key === "1" || e.key === "ArrowLeft";
-    const is2 = e.code === "Digit2" || e.code === "Numpad2" || e.key === "2" || e.key === "ArrowRight" || e.key === "Tab";
+    const k = normalizeKey(e);
+    if (!k) return;
 
-    if (isR || isC) {
+    if (k === "r" || k === "c") {
       e.preventDefault();
       if (this.stage === "calibration") {
         this.resetCalibration();
       } else {
         this.clearTrailStrokes();
       }
-    } else if (is1) {
+    } else if (k === "1" || k === "ArrowLeft") {
       e.preventDefault();
       this.setStage("calibration");
-    } else if (is2) {
+    } else if (k === "2" || k === "ArrowRight" || k === "Tab") {
       e.preventDefault();
       this.setStage("trail");
     }
   }
+
+
 
   public onPointer(e: PointerEvent): void {
     if (!this.canvas) return;

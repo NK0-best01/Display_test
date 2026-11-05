@@ -22,7 +22,7 @@ export class MultiTouchTestModule implements TestModule {
   public readonly description =
     "ตรวจจับหลายนิ้วพร้อมกัน วาดเส้นต่อเนื่อง (Coalesced) และโหมดตาราง Grid เช็คโซนทัชทั่วจอ";
   public readonly controlsHint =
-    "โหมด: [1] ตรวจจับจุดสัมผัส [2] วาดเส้น [3] ตาราง Grid | C/R ล้างผล | กดค้างมุมซ้ายบน 1 วิ หรือ Esc เพื่อกลับเมนู";
+    "โหมด: [1] ตรวจจับจุดสัมผัส [2] วาดเส้น [3] ตาราง Grid | C/R ล้างผล | แตะปุ่มบนจอได้ทันที หรือ Esc กลับเมนู";
   public readonly usesTouchDirectly = true; // ปิดการปัดสลับหน้าของระบบกลาง
 
   private canvas: HTMLCanvasElement | null = null;
@@ -91,6 +91,14 @@ export class MultiTouchTestModule implements TestModule {
     this.ctx = null;
   }
 
+  public clearActivePointers(): void {
+    if (this.activePointers.size > 0) {
+      this.activePointers.clear();
+      this.emitStatus();
+      this.scheduleDraw();
+    }
+  }
+
   public onKey(e: KeyboardEvent): void {
     const k = normalizeKey(e);
     if (!k) return;
@@ -122,7 +130,12 @@ export class MultiTouchTestModule implements TestModule {
     const physX = Math.round(e.clientX * dpr);
     const physY = Math.round(e.clientY * dpr);
 
+    // ตรวจสอบการกดปุ่มแท็บหรือปุ่มควบคุมบนหน้าจอ (Touch-friendly UI)
     if (e.type === "pointerdown") {
+      if (this.handleOnScreenButtons(physX, physY, this.canvas.width, this.canvas.height, dpr)) {
+        return;
+      }
+
       const colorIndex = Math.abs(e.pointerId) % this.fingerColors.length;
       const color = this.fingerColors[colorIndex] || "#38bdf8";
 
@@ -150,8 +163,19 @@ export class MultiTouchTestModule implements TestModule {
       this.emitStatus();
       this.scheduleDraw();
     } else if (e.type === "pointermove") {
+      // ดักจับกรณีเมาส์ปล่อยปุ่มไปแล้วแต่ยังค้าง
+      if (e.pointerType === "mouse" && e.buttons === 0 && this.activePointers.has(e.pointerId)) {
+        this.activePointers.delete(e.pointerId);
+        this.emitStatus();
+        this.scheduleDraw();
+        return;
+      }
+
       const ptr = this.activePointers.get(e.pointerId);
       if (ptr) {
+        const prevX = ptr.x;
+        const prevY = ptr.y;
+
         ptr.x = physX;
         ptr.y = physY;
         ptr.pressure = e.pressure || 0.5;
@@ -177,12 +201,17 @@ export class MultiTouchTestModule implements TestModule {
         }
 
         if (this.subMode === "grid") {
-          this.markGridAt(physX, physY);
+          this.markGridLine(prevX, prevY, physX, physY);
         }
 
         this.scheduleDraw();
       }
-    } else if (e.type === "pointerup" || e.type === "pointercancel") {
+    } else if (
+      e.type === "pointerup" ||
+      e.type === "pointercancel" ||
+      e.type === "lostpointercapture" ||
+      (e.type === "pointerleave" && e.pointerType === "touch")
+    ) {
       const ptr = this.activePointers.get(e.pointerId);
       if (ptr && this.subMode === "draw" && ptr.history.length > 1) {
         this.completedPaths.push({
@@ -207,6 +236,9 @@ export class MultiTouchTestModule implements TestModule {
   }
 
   public setSubMode(mode: TouchSubMode): void {
+    if (this.subMode === mode) return;
+    // ล้างจุดสัมผัสทั้งหมดออกทันทีเมื่อเปลี่ยนโหมด ป้องกันจุดสัมผัสเดิมรั่วไหลข้ามโหมด
+    this.activePointers.clear();
     this.subMode = mode;
     this.emitStatus();
     this.scheduleDraw();
@@ -225,8 +257,10 @@ export class MultiTouchTestModule implements TestModule {
   public resetCurrentMode(): void {
     if (this.subMode === "draw") {
       this.completedPaths = [];
+      this.activePointers.clear();
     } else if (this.subMode === "grid") {
       this.resetGrid();
+      this.activePointers.clear();
     } else {
       this.peakTouches = this.activePointers.size;
     }
@@ -263,13 +297,99 @@ export class MultiTouchTestModule implements TestModule {
     }
   }
 
+  private markGridLine(x0: number, y0: number, x1: number, y1: number): void {
+    if (!this.canvas) return;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const stepSize = Math.max(8, Math.min(this.canvas.width / this.gridCols, this.canvas.height / this.gridRows) / 4);
+    const steps = Math.max(1, Math.ceil(dist / stepSize));
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = x0 + dx * t;
+      const y = y0 + dy * t;
+      this.markGridAt(x, y);
+    }
+  }
+
+  private getSubModeTabsLayout(w: number, dpr: number) {
+    const tabs = [
+      { id: "points" as const, label: "[1] จุดสัมผัส (Multi-touch)" },
+      { id: "draw" as const, label: "[2] โหมดวาดเส้น (Draw)" },
+      { id: "grid" as const, label: "[3] ตารางเช็คทั่วจอ (Grid 16×12)" },
+    ];
+
+    const tabH = Math.round(44 * dpr);
+    const totalW = Math.min(w - Math.round(30 * dpr), Math.round(660 * dpr));
+    const startX = (w - totalW) / 2;
+    const startY = Math.round(12 * dpr);
+    const tabW = totalW / tabs.length;
+    return { tabs, tabH, totalW, startX, startY, tabW };
+  }
+
+  private handleOnScreenButtons(
+    physX: number,
+    physY: number,
+    w: number,
+    h: number,
+    dpr: number
+  ): boolean {
+    // 1. ตรวจสอบแถบแท็บด้านบน
+    const { tabs, tabH, totalW, startX, startY, tabW } = this.getSubModeTabsLayout(w, dpr);
+    const hitPadding = Math.round(8 * dpr);
+
+    if (
+      physY >= startY - hitPadding &&
+      physY <= startY + tabH + hitPadding &&
+      physX >= startX - hitPadding &&
+      physX <= startX + totalW + hitPadding
+    ) {
+      const clampedX = Math.max(startX, Math.min(startX + totalW - 1, physX));
+      const idx = Math.floor((clampedX - startX) / tabW);
+      const target = tabs[idx];
+      if (target) {
+        this.setSubMode(target.id);
+        return true;
+      }
+    }
+
+    // 2. ตรวจสอบปุ่มล้างผล/รีเซ็ตมุมขวาล่าง
+    const btnW = Math.round(160 * dpr);
+    const btnH = Math.round(48 * dpr);
+    const btnX = w - btnW - Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(20 * dpr);
+
+    if (
+      physX >= btnX - hitPadding &&
+      physX <= btnX + btnW + hitPadding &&
+      physY >= btnY - hitPadding &&
+      physY <= btnY + btnH + hitPadding
+    ) {
+      if (this.subMode === "points") {
+        this.resetCurrentMode();
+        return true;
+      } else if (this.subMode === "draw") {
+        this.resetCurrentMode();
+        return true;
+      } else if (this.subMode === "grid") {
+        this.resetGrid();
+        this.emitStatus();
+        this.scheduleDraw();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private emitStatus(): void {
     const active = this.activePointers.size;
     const hwMax = navigator.maxTouchPoints ?? 0;
     let modeText = "";
 
     if (this.subMode === "points") {
-      modeText = `สัมผัสขณะนี้: ${active} จุด | สูงสุดที่ตรวจพบ: ${this.peakTouches} จุด (ฮาร์ดแวร์รองรับ: ${hwMax} จุด)`;
+      modeText = `สัมผัสขณะนี้: ${active} จุด | สูงสุดที่ตรวจพบ: ${this.peakTouches} จุด (ฮาร์ดแวร์: ${hwMax} จุด)`;
     } else if (this.subMode === "draw") {
       modeText = `โหมดวาดเส้นต่อเนื่อง (Active: ${active} นิ้ว | เส้นสะสม: ${this.completedPaths.length})`;
     } else if (this.subMode === "grid") {
@@ -307,7 +427,7 @@ export class MultiTouchTestModule implements TestModule {
       this.drawPointsMode(ctx, width, height, dpr);
     }
 
-    // แถบควบคุมและสลับโหมดด้านบนจอ (ขนาดปุ่มสัมผัส >= 64px)
+    // แถบสลับโหมดยอดนิยมด้านบนจอ (แตะเปลี่ยนโหมดด้วยนิ้วได้ทันที)
     this.drawSubModeNavBar(ctx, width, dpr);
   }
 
@@ -386,7 +506,7 @@ export class MultiTouchTestModule implements TestModule {
 
       // จัดให้อยู่ในจอ
       if (badgeX + badgeW > w - 10) badgeX = ptr.x - radius - badgeW - Math.round(12 * dpr);
-      if (badgeY < 60) badgeY = 60;
+      if (badgeY < 70) badgeY = 70;
       if (badgeY + badgeH > h - 10) badgeY = h - badgeH - 10;
 
       ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
@@ -449,11 +569,29 @@ export class MultiTouchTestModule implements TestModule {
       ctx.fillStyle = "#71717a";
       ctx.font = `${Math.round(12 * dpr)}px sans-serif`;
       ctx.fillText(
-        "สามารถแตะได้พร้อมกันอย่างน้อย 10 จุดตามขีดจำกัดของหน้าจอทัชสกรีน",
+        "สามารถแตะได้พร้อมกันหลายนิ้วตามขีดจำกัดของหน้าจอทัชสกรีน",
         cx,
         cy + Math.round(40 * dpr)
       );
     }
+
+    // ปุ่มรีเซ็ตสถิติมุมขวาล่าง
+    const btnW = Math.round(160 * dpr);
+    const btnH = Math.round(48 * dpr);
+    const btnX = w - btnW - Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(20 * dpr);
+
+    ctx.fillStyle = "rgba(39, 39, 42, 0.9)";
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = "#52525b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🔄 รีเซ็ตสถิติ (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawDrawMode(
@@ -499,8 +637,8 @@ export class MultiTouchTestModule implements TestModule {
     });
 
     // ปุ่มล้างเส้นวาดมุมขวาล่าง
-    const btnW = Math.round(140 * dpr);
-    const btnH = Math.round(40 * dpr);
+    const btnW = Math.round(160 * dpr);
+    const btnH = Math.round(48 * dpr);
     const btnX = w - btnW - Math.round(20 * dpr);
     const btnY = h - btnH - Math.round(20 * dpr);
 
@@ -514,7 +652,7 @@ export class MultiTouchTestModule implements TestModule {
     ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("ล้างเส้นวาด (C)", btnX + btnW / 2, btnY + btnH / 2);
+    ctx.fillText("🗑️ ล้างเส้นวาด (C)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawGridMode(
@@ -556,9 +694,9 @@ export class MultiTouchTestModule implements TestModule {
     });
 
     // แถบสรุปความครอบคลุมด้านล่าง
-    const barW = Math.min(w - Math.round(40 * dpr), Math.round(520 * dpr));
-    const barH = Math.round(44 * dpr);
-    const barX = (w - barW) / 2;
+    const barW = Math.min(w - Math.round(200 * dpr), Math.round(480 * dpr));
+    const barH = Math.round(48 * dpr);
+    const barX = Math.round(20 * dpr);
     const barY = h - barH - Math.round(20 * dpr);
 
     ctx.fillStyle = "rgba(9, 9, 11, 0.92)";
@@ -573,19 +711,28 @@ export class MultiTouchTestModule implements TestModule {
     ctx.font = `bold ${Math.round(13 * dpr)}px sans-serif`;
     const pct = ((touchedCount / totalCount) * 100).toFixed(1);
     ctx.fillText(
-      `ความครอบคลุม: ${touchedCount}/${totalCount} ช่อง (${pct}%)`,
+      `ครอบคลุม: ${touchedCount}/${totalCount} ช่อง (${pct}%)`,
       barX + Math.round(16 * dpr),
       barY + barH / 2
     );
 
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = `${Math.round(11 * dpr)}px sans-serif`;
-    ctx.fillText(
-      "แตะ/ลากให้ทั่วจอ | กด R รีเซ็ต",
-      barX + barW - Math.round(16 * dpr),
-      barY + barH / 2
-    );
+    // ปุ่มล้างตารางมุมขวาล่าง
+    const btnW = Math.round(160 * dpr);
+    const btnH = Math.round(48 * dpr);
+    const btnX = w - btnW - Math.round(20 * dpr);
+    const btnY = h - btnH - Math.round(20 * dpr);
+
+    ctx.fillStyle = "rgba(39, 39, 42, 0.92)";
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = "#52525b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🔄 ล้างตาราง (R)", btnX + btnW / 2, btnY + btnH / 2);
   }
 
   private drawSubModeNavBar(
@@ -593,35 +740,24 @@ export class MultiTouchTestModule implements TestModule {
     w: number,
     dpr: number
   ): void {
-    const tabs = [
-      { id: "points", label: "[1] ตรวจจับจุดสัมผัส (Multi-touch)" },
-      { id: "draw", label: "[2] โหมดวาดเส้น (Draw)" },
-      { id: "grid", label: "[3] ตารางเช็คทั่วจอ (Grid 16×12)" },
-    ];
-
-    const tabH = Math.round(36 * dpr);
-    const totalW = Math.min(w - Math.round(40 * dpr), Math.round(620 * dpr));
-    const startX = (w - totalW) / 2;
-    const startY = Math.round(14 * dpr);
-    const tabW = totalW / tabs.length;
+    const { tabs, tabH, startX, startY, tabW } = this.getSubModeTabsLayout(w, dpr);
 
     tabs.forEach((t, i) => {
       const tx = startX + i * tabW;
       const isSelected = this.subMode === t.id;
 
-      ctx.fillStyle = isSelected ? "#0284c7" : "rgba(24, 24, 27, 0.88)";
+      ctx.fillStyle = isSelected ? "#0284c7" : "rgba(24, 24, 27, 0.92)";
       ctx.fillRect(tx, startY, tabW, tabH);
 
       ctx.strokeStyle = isSelected ? "#38bdf8" : "#3f3f46";
       ctx.lineWidth = 1;
       ctx.strokeRect(tx, startY, tabW, tabH);
 
-      ctx.fillStyle = isSelected ? "#ffffff" : "#a1a1aa";
-      ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+      ctx.fillStyle = isSelected ? "#ffffff" : "#d4d4d8";
+      ctx.font = `bold ${Math.round(12 * dpr)}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(t.label, tx + tabW / 2, startY + tabH / 2);
     });
   }
 }
-

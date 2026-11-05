@@ -161,6 +161,28 @@ export class DeadPixelTestModule implements TestModule {
     }
   }
 
+  private getToolbarBounds(w: number, h: number, dpr: number) {
+    const btnW = Math.round(130 * dpr);
+    const magW = Math.round(150 * dpr);
+    const clrW = Math.round(150 * dpr);
+    const btnH = Math.round(44 * dpr);
+    const btnY = h - btnH - Math.round(14 * dpr);
+    const totalW = btnW * 2 + magW + clrW + Math.round(30 * dpr);
+    const startX = Math.round((w - totalW) / 2);
+    return {
+      btnH,
+      btnY,
+      prevX: startX,
+      prevW: btnW,
+      magX: startX + btnW + Math.round(10 * dpr),
+      magW,
+      clrX: startX + btnW + magW + Math.round(20 * dpr),
+      clrW,
+      nextX: startX + btnW + magW + clrW + Math.round(30 * dpr),
+      nextW: btnW,
+    };
+  }
+
   public onPointer(e: PointerEvent): void {
     if (!this.canvas) return;
     this.resetCursorHideTimer();
@@ -171,6 +193,27 @@ export class DeadPixelTestModule implements TestModule {
     const isTouch = e.pointerType === "touch";
 
     if (e.type === "pointerdown") {
+      const bounds = this.getToolbarBounds(this.canvas.width, this.canvas.height, dpr);
+      const hitPadding = Math.round(6 * dpr);
+      if (!this.isCursorHidden && physY >= bounds.btnY - hitPadding && physY <= bounds.btnY + bounds.btnH + hitPadding) {
+        if (physX >= bounds.prevX - hitPadding && physX <= bounds.prevX + bounds.prevW + hitPadding) {
+          this.prevColor();
+          return;
+        }
+        if (physX >= bounds.magX - hitPadding && physX <= bounds.magX + bounds.magW + hitPadding) {
+          this.toggleMagnifier();
+          return;
+        }
+        if (physX >= bounds.clrX - hitPadding && physX <= bounds.clrX + bounds.clrW + hitPadding) {
+          this.clearMarkers();
+          return;
+        }
+        if (physX >= bounds.nextX - hitPadding && physX <= bounds.nextX + bounds.nextW + hitPadding) {
+          this.nextColor();
+          return;
+        }
+      }
+
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
       this.pointerDownTime = performance.now();
@@ -355,6 +398,47 @@ export class DeadPixelTestModule implements TestModule {
     if (this.defectMarkers.length > 0) {
       this.drawDefectCounterBar(ctx, width, height, dpr);
     }
+
+    // 5. แถบปุ่มสัมผัสควบคุมด้านล่าง (แสดงเมื่อเคอร์เซอร์ไม่ถูกซ่อน)
+    if (!this.isCursorHidden) {
+      this.drawTouchToolbar(ctx, width, height, dpr);
+    }
+  }
+
+  private drawTouchToolbar(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number): void {
+    const bounds = this.getToolbarBounds(w, h, dpr);
+
+    const drawBtn = (x: number, y: number, bw: number, bh: number, label: string, active = false) => {
+      ctx.fillStyle = active ? "#0284c7" : "rgba(24, 24, 27, 0.9)";
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = active ? "#38bdf8" : "#3f3f46";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, bw, bh);
+
+      ctx.fillStyle = active ? "#ffffff" : "#d4d4d8";
+      ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + bw / 2, y + bh / 2);
+    };
+
+    drawBtn(bounds.prevX, bounds.btnY, bounds.prevW, bounds.btnH, "◀ สีก่อนหน้า");
+    drawBtn(
+      bounds.magX,
+      bounds.btnY,
+      bounds.magW,
+      bounds.btnH,
+      this.magnifierEnabled ? `🔍 แว่น ${this.zoomLevel}x: ON` : `🔍 แว่นขยาย (M)`,
+      this.magnifierEnabled
+    );
+    drawBtn(
+      bounds.clrX,
+      bounds.btnY,
+      bounds.clrW,
+      bounds.btnH,
+      `🗑️ ล้างจุด (${this.defectMarkers.length})`
+    );
+    drawBtn(bounds.nextX, bounds.btnY, bounds.nextW, bounds.btnH, "สีถัดไป ▶");
   }
 
   private drawDefectMarkers(
@@ -539,7 +623,10 @@ export class DeadPixelTestModule implements TestModule {
     dpr: number
   ): void {
     const barH = Math.round(36 * dpr);
-    const barY = h - barH - Math.round(12 * dpr);
+    const tb = this.getToolbarBounds(w, h, dpr);
+    const barY = !this.isCursorHidden
+      ? tb.btnY - barH - Math.round(10 * dpr)
+      : h - barH - Math.round(12 * dpr);
     const barW = Math.min(w - Math.round(40 * dpr), Math.round(520 * dpr));
     const barX = (w - barW) / 2;
 

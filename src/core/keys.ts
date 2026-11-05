@@ -1,4 +1,4 @@
-/**
+﻿/**
  * src/core/keys.ts
  *
  * ระบบจัดการคีย์บอร์ดแบบไม่ขึ้นกับภาษา (Language-independent Keyboard Handler)

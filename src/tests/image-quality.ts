@@ -75,10 +75,46 @@ export class ImageQualityTestModule implements TestModule {
     }
   }
 
+  private getTouchNavBounds(w: number, h: number, dpr: number) {
+    const btnW = Math.round(140 * dpr);
+    const indicatorW = Math.round(160 * dpr);
+    const btnH = Math.round(44 * dpr);
+    const btnY = h - btnH - Math.round(14 * dpr);
+    const prevX = Math.round(20 * dpr);
+    const indX = Math.round((w - indicatorW) / 2);
+    const nextX = w - btnW - Math.round(20 * dpr);
+    return { btnW, indicatorW, btnH, btnY, prevX, indX, nextX };
+  }
+
   public onPointer(e: PointerEvent): void {
+    if (!this.canvas) return;
+
     if (e.type === "pointerdown") {
       this.pointerStartX = e.clientX;
       this.pointerStartY = e.clientY;
+
+      const dpr = window.devicePixelRatio || 1;
+      const physX = Math.round(e.clientX * dpr);
+      const physY = Math.round(e.clientY * dpr);
+      const { btnW, btnH, btnY, prevX, nextX } = this.getTouchNavBounds(
+        this.canvas.width,
+        this.canvas.height,
+        dpr
+      );
+
+      const hitPadding = Math.round(8 * dpr);
+      if (physY >= btnY - hitPadding && physY <= btnY + btnH + hitPadding) {
+        if (physX >= prevX - hitPadding && physX <= prevX + btnW + hitPadding) {
+          this.pointerStartX = null;
+          this.prevPattern();
+          return;
+        }
+        if (physX >= nextX - hitPadding && physX <= nextX + btnW + hitPadding) {
+          this.pointerStartX = null;
+          this.nextPattern();
+          return;
+        }
+      }
     } else if (e.type === "pointerup") {
       if (this.pointerStartX !== null) {
         const dx = e.clientX - this.pointerStartX;
@@ -156,6 +192,48 @@ export class ImageQualityTestModule implements TestModule {
     if (pattern) {
       pattern.draw(this.ctx, width, height, dpr);
     }
+
+    // วาดแถบปุ่มสัมผัสควบคุมด้านล่างจอ (รองรับการใช้นิ้วกด 100%)
+    this.drawTouchNavBar(this.ctx, width, height, dpr);
+  }
+
+  private drawTouchNavBar(ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number): void {
+    const { btnW, indicatorW, btnH, btnY, prevX, indX, nextX } = this.getTouchNavBounds(w, h, dpr);
+
+    const drawBtn = (x: number, y: number, bw: number, bh: number, label: string) => {
+      ctx.fillStyle = "rgba(24, 24, 27, 0.88)";
+      ctx.fillRect(x, y, bw, bh);
+      ctx.strokeStyle = "#3f3f46";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, bw, bh);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + bw / 2, y + bh / 2);
+    };
+
+    drawBtn(prevX, btnY, btnW, btnH, "◀ ภาพก่อนหน้า");
+
+    // กล่องแสดงลำดับภาพตรงกลาง
+    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    ctx.fillRect(indX, btnY, indicatorW, btnH);
+    ctx.strokeStyle = "#0284c7";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(indX, btnY, indicatorW, btnH);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = `bold ${Math.round(11 * dpr)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(
+      `ภาพที่ ${this.currentIndex + 1} / ${this.patterns.length}`,
+      indX + indicatorW / 2,
+      btnY + btnH / 2
+    );
+
+    drawBtn(nextX, btnY, btnW, btnH, "ภาพถัดไป ▶");
   }
 
   // -------------------------------------------------------------
