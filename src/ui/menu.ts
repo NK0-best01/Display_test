@@ -1,5 +1,4 @@
 import type { TestModule, TestModuleId } from "../core/types";
-import { collectDisplayInfo } from "../core/display-info";
 import { exitApp } from "../core/fullscreen";
 
 export interface MenuCallbacks {
@@ -72,7 +71,13 @@ export async function renderMainMenu(
   modules: TestModule[],
   callbacks: MenuCallbacks
 ): Promise<void> {
-  const info = await collectDisplayInfo();
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = window.innerWidth;
+  const cssHeight = window.innerHeight;
+  const initialPhysicalWidth = Math.round(cssWidth * dpr);
+  const initialPhysicalHeight = Math.round(cssHeight * dpr);
+  const initialDpr = Number(dpr.toFixed(2));
+  const initialTouchPoints = navigator.maxTouchPoints ?? 0;
 
   container.innerHTML = `
     <div class="relative w-full h-full flex flex-col justify-between bg-[#08090d] text-zinc-100 p-3 sm:p-5 lg:p-6 overflow-y-auto select-none">
@@ -106,18 +111,18 @@ export async function renderMainMenu(
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></span>
               <span class="text-[10px] font-mono font-semibold text-zinc-400">RES</span>
-              <span class="text-xs font-mono font-bold text-zinc-100">${info.physicalWidth}×${info.physicalHeight}</span>
+              <span id="telemetry-res" class="text-xs font-mono font-bold text-zinc-100">${initialPhysicalWidth}×${initialPhysicalHeight}</span>
             </div>
 
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <span class="text-[10px] font-mono font-semibold text-zinc-400">DPR</span>
-              <span class="text-xs font-mono font-bold text-zinc-100">${info.devicePixelRatio}x</span>
+              <span id="telemetry-dpr" class="text-xs font-mono font-bold text-zinc-100">${initialDpr}x</span>
             </div>
 
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/90 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]"></span>
               <span class="text-[10px] font-mono font-semibold text-zinc-400">TOUCH</span>
-              <span class="text-xs font-mono font-bold text-zinc-100">${info.maxTouchPoints} จุด</span>
+              <span id="telemetry-touch" class="text-xs font-mono font-bold text-zinc-100">${initialTouchPoints} จุด</span>
             </div>
 
             <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/25 text-emerald-300">

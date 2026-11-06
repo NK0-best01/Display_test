@@ -1,4 +1,4 @@
-﻿import { getMonitorInfo, isTauri } from "./fullscreen";
+import { getMonitorInfo, isTauri } from "./fullscreen";
 
 export interface DisplayInfoSnapshot {
   cssWidth: number;
@@ -41,31 +41,54 @@ export async function collectDisplayInfo(): Promise<DisplayInfoSnapshot> {
   const dpr = window.devicePixelRatio || 1;
   const cssWidth = window.innerWidth;
   const cssHeight = window.innerHeight;
-  const monitor = await getMonitorInfo();
 
-  const physicalWidth = monitor ? monitor.size.width : Math.round(cssWidth * dpr);
-  const physicalHeight = monitor ? monitor.size.height : Math.round(cssHeight * dpr);
-  const monitorScaleFactor = monitor ? monitor.scaleFactor : dpr;
-  const monitorName = monitor?.name
-    ? monitor.name
-    : isTauri()
-      ? "จอภาพหลัก (Tauri Monitor)"
-      : "จอภาพมาตรฐาน (WebView / Browser)";
+  try {
+    const monitor = await getMonitorInfo();
 
-  return {
-    cssWidth,
-    cssHeight,
-    physicalWidth,
-    physicalHeight,
-    devicePixelRatio: Number(dpr.toFixed(2)),
-    monitorName,
-    monitorScaleFactor: Number(monitorScaleFactor.toFixed(2)),
-    maxTouchPoints: navigator.maxTouchPoints ?? 0,
-    osPlatform: detectOSName(),
-    userAgent: navigator.userAgent,
-    colorDepth: window.screen?.colorDepth ?? 24,
-    refreshRateHint: "วัดตาม VSync (requestAnimationFrame)",
-  };
+    const physicalWidth = monitor?.size?.width
+      ? monitor.size.width
+      : Math.round(cssWidth * dpr);
+    const physicalHeight = monitor?.size?.height
+      ? monitor.size.height
+      : Math.round(cssHeight * dpr);
+    const monitorScaleFactor = monitor?.scaleFactor ?? dpr;
+    const monitorName = monitor?.name
+      ? monitor.name
+      : isTauri()
+        ? "จอภาพหลัก (Tauri Monitor)"
+        : "จอภาพมาตรฐาน (WebView / Browser)";
+
+    return {
+      cssWidth,
+      cssHeight,
+      physicalWidth,
+      physicalHeight,
+      devicePixelRatio: Number(dpr.toFixed(2)),
+      monitorName,
+      monitorScaleFactor: Number(monitorScaleFactor.toFixed(2)),
+      maxTouchPoints: navigator.maxTouchPoints ?? 0,
+      osPlatform: detectOSName(),
+      userAgent: navigator.userAgent || "ไม่ทราบ User Agent",
+      colorDepth: window.screen?.colorDepth ?? 24,
+      refreshRateHint: "วัดตาม VSync (requestAnimationFrame)",
+    };
+  } catch (err) {
+    console.warn("Failed to collect detailed monitor info, falling back to window:", err);
+    return {
+      cssWidth,
+      cssHeight,
+      physicalWidth: Math.round(cssWidth * dpr),
+      physicalHeight: Math.round(cssHeight * dpr),
+      devicePixelRatio: Number(dpr.toFixed(2)),
+      monitorName: isTauri() ? "จอภาพหลัก (Tauri Monitor)" : "จอภาพมาตรฐาน (WebView / Browser)",
+      monitorScaleFactor: Number(dpr.toFixed(2)),
+      maxTouchPoints: navigator.maxTouchPoints ?? 0,
+      osPlatform: detectOSName(),
+      userAgent: navigator.userAgent || "ไม่ทราบ User Agent",
+      colorDepth: window.screen?.colorDepth ?? 24,
+      refreshRateHint: "วัดตาม VSync (requestAnimationFrame)",
+    };
+  }
 }
 
 /**

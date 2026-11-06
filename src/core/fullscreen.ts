@@ -76,14 +76,18 @@ export async function getFullscreenState(): Promise<boolean> {
 }
 
 /**
- * อ่านข้อมูล Monitor ปัจจุบันผ่าน Tauri API
+ * อ่านข้อมูล Monitor ปัจจุบันผ่าน Tauri API พร้อม Timeout ป้องกันการค้าง
  */
 export async function getMonitorInfo(): Promise<Monitor | null> {
   if (isTauri()) {
     try {
-      return await currentMonitor();
+      const monitorPromise = currentMonitor();
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 1000)
+      );
+      return await Promise.race([monitorPromise, timeoutPromise]);
     } catch (err) {
-      console.error("Failed to get current monitor:", err);
+      console.warn("Failed to get current monitor:", err);
     }
   }
   return null;

@@ -19,7 +19,8 @@
         "height": 768,
         "fullscreen": true,
         "decorations": false,
-        "resizable": false
+        "resizable": false,
+        "devtools": true
       }
     ],
     "security": {
