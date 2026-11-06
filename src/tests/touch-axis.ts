@@ -241,6 +241,11 @@ export class TouchAxisTestModule implements TestModule {
     } else if (k === "2" || k === "ArrowRight" || k === "Tab") {
       e.preventDefault();
       this.setStage("trail");
+    } else if (k === "Enter" || k === " ") {
+      if (this.stage === "calibration" && this.currentStep >= 4) {
+        e.preventDefault();
+        this.setStage("trail");
+      }
     }
   }
 
@@ -256,11 +261,13 @@ export class TouchAxisTestModule implements TestModule {
     const normX = Math.max(0, Math.min(1, physX / this.canvas.width));
     const normY = Math.max(0, Math.min(1, physY / this.canvas.height));
 
-    // ตรวจสอบการกดปุ่มเปลี่ยนแท็บหรือปุ่มควบคุมล่างจอ
+    // ตรวจสอบการกดปุ่มเปลี่ยนแท็บหรือปุ่มควบคุมในการ์ด/ล่างจอ
     if (e.type === "pointerdown") {
       if (this.handleButtonsPointerDown(physX, physY, this.canvas.width, this.canvas.height, dpr)) {
         return;
       }
+    } else if (e.type === "pointermove" && e.pointerType === "mouse") {
+      this.updateCursor(physX, physY, this.canvas.width, this.canvas.height, dpr);
     }
 
     if (this.stage === "calibration") {
@@ -676,51 +683,132 @@ export class TouchAxisTestModule implements TestModule {
     h: number,
     dpr: number
   ): boolean {
-    // 1. ตรวจสอบแท็บด้านบน
+    // 1. ตรวจสอบแท็บด้านบน (ทั้ง 2 หน้า)
     const tabH = Math.round(44 * dpr);
     const totalW = Math.min(w - Math.round(40 * dpr), Math.round(520 * dpr));
     const startX = (w - totalW) / 2;
     const startY = Math.round(10 * dpr);
     const tabW = totalW / 2;
+    const hitPadTab = Math.round(8 * dpr);
 
-    if (py >= startY && py <= startY + tabH) {
-      if (px >= startX && px < startX + tabW) {
+    if (py >= startY - hitPadTab && py <= startY + tabH + hitPadTab) {
+      if (px >= startX - hitPadTab && px < startX + tabW) {
         this.setStage("calibration");
         return true;
-      } else if (px >= startX + tabW && px <= startX + totalW) {
+      } else if (px >= startX + tabW && px <= startX + totalW + hitPadTab) {
         this.setStage("trail");
         return true;
       }
     }
 
-    // 2. ตรวจสอบปุ่มล่างจอ
-    const btnW = Math.round(200 * dpr);
-    const btnH = Math.round(56 * dpr); // ขยายขอบเขตสัมผัสให้แตะง่าย
-    const btnGap = Math.round(20 * dpr);
-    const btnY = h - btnH - Math.round(24 * dpr);
+    // 2. ตรวจสอบปุ่มในการ์ดผลการวิเคราะห์ (หน้า 1 Calibration เมื่อแตะครบ 4 มุม)
+    if (this.stage === "calibration" && this.currentStep >= 4 && this.analysisResult) {
+      const cardW = Math.min(w - Math.round(40 * dpr), Math.round(620 * dpr));
+      const cardH = Math.round(240 * dpr);
+      const cardX = (w - cardW) / 2;
+      const cardY = (h - cardH) / 2;
 
-    if (py >= btnY && py <= h) {
+      const btnW = Math.round(160 * dpr);
+      const btnH = Math.round(42 * dpr);
+      const btnGap = Math.round(20 * dpr);
+      const btnY = cardY + cardH - btnH - Math.round(20 * dpr);
+      const btn1X = cardX + cardW / 2 - btnW - btnGap / 2;
+      const btn2X = cardX + cardW / 2 + btnGap / 2;
+      const hitPad = Math.round(12 * dpr); // เผื่อขอบเขตแตะสัมผัสให้ติดง่าย
+
+      if (py >= btnY - hitPad && py <= btnY + btnH + hitPad) {
+        if (px >= btn1X - hitPad && px <= btn1X + btnW + hitPad) {
+          this.resetCalibration();
+          return true;
+        } else if (px >= btn2X - hitPad && px <= btn2X + btnW + hitPad) {
+          this.setStage("trail");
+          return true;
+        }
+      }
+    }
+
+    // 3. ตรวจสอบปุ่มควบคุมล่างจอสำหรับโหมดลากเส้น (Stage 2: Trail)
+    if (this.stage === "trail") {
+      const btnW = Math.round(200 * dpr);
+      const btnH = Math.round(48 * dpr);
+      const btnGap = Math.round(20 * dpr);
+      const btnY = h - btnH - Math.round(28 * dpr);
       const btn1X = w / 2 - btnW - btnGap / 2;
       const btn2X = w / 2 + btnGap / 2;
+      const hitPad = Math.round(12 * dpr);
 
-      if (px >= btn1X && px <= btn1X + btnW) {
-        if (this.stage === "calibration") {
-          this.resetCalibration();
-        } else {
+      if (py >= btnY - hitPad && py <= h) {
+        if (px >= btn1X - hitPad && px <= btn1X + btnW + hitPad) {
           this.clearTrailStrokes();
-        }
-        return true;
-      } else if (px >= btn2X && px <= btn2X + btnW) {
-        if (this.stage === "calibration") {
-          this.setStage("trail");
-        } else {
+          return true;
+        } else if (px >= btn2X - hitPad && px <= btn2X + btnW + hitPad) {
           this.setStage("calibration");
+          return true;
         }
-        return true;
       }
     }
 
     return false;
+  }
+
+  private updateCursor(
+    px: number,
+    py: number,
+    w: number,
+    h: number,
+    dpr: number
+  ): void {
+    if (!this.canvas) return;
+
+    // เช็คแท็บด้านบน
+    const tabH = Math.round(44 * dpr);
+    const totalW = Math.min(w - Math.round(40 * dpr), Math.round(520 * dpr));
+    const startX = (w - totalW) / 2;
+    const startY = Math.round(10 * dpr);
+    if (py >= startY && py <= startY + tabH && px >= startX && px <= startX + totalW) {
+      this.canvas.style.cursor = "pointer";
+      return;
+    }
+
+    // เช็คปุ่มในการ์ดผลลัพธ์
+    if (this.stage === "calibration" && this.currentStep >= 4 && this.analysisResult) {
+      const cardW = Math.min(w - Math.round(40 * dpr), Math.round(620 * dpr));
+      const cardH = Math.round(240 * dpr);
+      const cardX = (w - cardW) / 2;
+      const cardY = (h - cardH) / 2;
+      const btnW = Math.round(160 * dpr);
+      const btnH = Math.round(42 * dpr);
+      const btnGap = Math.round(20 * dpr);
+      const btnY = cardY + cardH - btnH - Math.round(20 * dpr);
+      const btn1X = cardX + cardW / 2 - btnW - btnGap / 2;
+      const btn2X = cardX + cardW / 2 + btnGap / 2;
+
+      if (py >= btnY && py <= btnY + btnH) {
+        if ((px >= btn1X && px <= btn1X + btnW) || (px >= btn2X && px <= btn2X + btnW)) {
+          this.canvas.style.cursor = "pointer";
+          return;
+        }
+      }
+    }
+
+    // เช็คปุ่มล่างจอในโหมด Trail
+    if (this.stage === "trail") {
+      const btnW = Math.round(200 * dpr);
+      const btnH = Math.round(48 * dpr);
+      const btnGap = Math.round(20 * dpr);
+      const btnY = h - btnH - Math.round(28 * dpr);
+      const btn1X = w / 2 - btnW - btnGap / 2;
+      const btn2X = w / 2 + btnGap / 2;
+
+      if (py >= btnY && py <= btnY + btnH) {
+        if ((px >= btn1X && px <= btn1X + btnW) || (px >= btn2X && px <= btn2X + btnW)) {
+          this.canvas.style.cursor = "pointer";
+          return;
+        }
+      }
+    }
+
+    this.canvas.style.cursor = "default";
   }
 
   private drawTopNavTabs(

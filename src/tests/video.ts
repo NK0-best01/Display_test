@@ -15,9 +15,18 @@ const ASPECT_MODE_LABELS: Record<VideoAspectMode, string> = {
       fill: "ยืดเต็มจอ",
 };
 
+// ค่าคงที่ตามข้อกำหนด Kiosk เสถียรภาพสูง 24 ชม.
+const SERVER = "http://127.0.0.1:8765";
+const WATCHDOG_TIMEOUT = 12_000; // ไม่มี progress เกินนี้ = ค้าง (12 วิ)
+const WATCHDOG_CHECK = 5_000;    // ตรวจสอบ watchdog ทุก 5 วิ
+const ERROR_THROTTLE = 300;      // หน่วงเวลา error ไม่ให้วนลูปเร็วกว่า 300ms
+
 /**
  * โมดูลทดสอบเล่นวิดีโอ (Video Playback Test)
- * รองรับการทดสอบภาพเคลื่อนไหว ความลื่นไหล การฉีกของภาพ และสี จากไฟล์ในโฟลเดอร์ videos/
+ * ออกแบบตามข้อกำหนด Kiosk 24 ชม. สำหรับ Linux WebKitGTK และ Windows
+ * - สตรีมผ่าน Local HTTP Server (รองรับ HTTP 206 Range)
+ * - เล่นผ่าน Dynamic iframe (ทำลายและสร้างใหม่ทุกคลิปเพื่อคืน dmabuf/GPU memory)
+ * - มี Watchdog กันค้าง และ Error Throttle
  */
 export class VideoTestModule implements TestModule {
       public readonly id: TestModuleId = "video";
@@ -40,12 +49,23 @@ export class VideoTestModule implements TestModule {
       private isLoading = true;
       public errorMessage: string | null = null;
 
-      // วิดีโอ Element ขณะเล่น
-      private videoElement: HTMLVideoElement | null = null;
+      // Iframe และสถานะขณะเล่น
+      private currentIframe: HTMLIFrameElement | null = null;
+      private isPaused = false;
       private aspectMode: VideoAspectMode = "contain";
       private isLooping = true;
       private isMuted = false;
-      private updateIntervalId: number | null = null;
+
+      // เมตริกและสถานะวิดีโอปัจจุบัน
+      private currentVideoWidth = 0;
+      private currentVideoHeight = 0;
+      private currentVideoDuration = 0;
+      private currentVideoTime = 0;
+
+      // ตัวจับเวลาและ Watchdog
+      private watchdogIntervalId: number | null = null;
+      private lastProgressTime = 0;
+      private lastErrorTime = 0;
 
       // UI สำหรับหน้ารายการ
       private listOverlayElement: HTMLDivElement | null = null;
@@ -53,8 +73,12 @@ export class VideoTestModule implements TestModule {
       // แถบควบคุมสัมผัสขณะเล่นวิดีโอ
       private playbackControlsEl: HTMLDivElement | null = null;
 
+      // Bound listener สำหรับ postMessage จาก iframe
+      private boundMessageListener: (e: MessageEvent) => void;
+
       constructor(onStatusChange?: (status: string) => void) {
             this.onStatusChange = onStatusChange;
+            this.boundMessageListener = (e: MessageEvent) => this.handleIframeMessage(e);
       }
 
       public async start(canvas: HTMLCanvasElement, _ctx: CanvasRenderingContext2D): Promise<void> {
@@ -63,12 +87,15 @@ export class VideoTestModule implements TestModule {
             this.state = "list";
             this.errorMessage = null;
 
+            window.addEventListener("message", this.boundMessageListener);
+
             // โหลดรายชื่อโฟลเดอร์และไฟล์วิดีโอ
             await this.scanVideos();
             this.renderCurrentState();
       }
 
       public stop(): void {
+            window.removeEventListener("message", this.boundMessageListener);
             this.cleanupPlayback();
             this.cleanupListUi();
             this.canvas = null;
@@ -76,7 +103,7 @@ export class VideoTestModule implements TestModule {
       }
 
       /**
-       * สแกนรายชื่อไฟล์วิดีโอผ่าน Tauri API
+       * สแกนรายชื่อไฟล์วิดีโอผ่าน HTTP server และ Tauri API
        */
       public async scanVideos(): Promise<void> {
             this.isLoading = true;
@@ -92,9 +119,25 @@ export class VideoTestModule implements TestModule {
                   this.videoDir = dir;
                   this.videoList = list;
             } catch {
-                  // Fallback สำหรับโหมดเบราว์เซอร์ / ทดสอบ
-                  this.videoDir = "videos";
-                  this.videoList = [];
+                  // Fallback สำหรับโหมดเบราว์เซอร์ / ทดสอบผ่าน Local HTTP
+                  try {
+                        const res = await fetch(`${SERVER}/videos/index.json`, { cache: "no-store" });
+                        if (res.ok) {
+                              const data = (await res.json()) as { files: string[] };
+                              this.videoDir = "videos";
+                              this.videoList = data.files.map((name) => ({
+                                    name,
+                                    path: name,
+                                    size_bytes: 0,
+                              }));
+                        } else {
+                              this.videoDir = "videos";
+                              this.videoList = [];
+                        }
+                  } catch {
+                        this.videoDir = "videos";
+                        this.videoList = [];
+                  }
             } finally {
                   this.isLoading = false;
                   if (this.selectedIndex >= this.videoList.length) {
@@ -154,7 +197,6 @@ export class VideoTestModule implements TestModule {
                   }
             } else if (this.state === "playing") {
                   if (key === "Escape") {
-                        // ย้อนกลับจากหน้าเล่นวิดีโอไปยังหน้ารายการ (ดักจับไว้ไม่ให้หลุดกลับเมนูหลักทันที)
                         e.preventDefault();
                         this.stopVideoAndBackToList();
                         return;
@@ -195,96 +237,224 @@ export class VideoTestModule implements TestModule {
       }
 
       /**
-       * เริ่มเล่นไฟล์วิดีโอตามดัชนี
+       * เริ่มเล่นไฟล์วิดีโอตามดัชนีผ่าน Dynamic Iframe + Local HTTP Streaming Server
        */
-      public async playVideo(index: number): Promise<void> {
-            if (index < 0 || index >= this.videoList.length) return;
+      public playVideo(index: number, isError = false): void {
+            if (this.videoList.length === 0) return;
 
-            this.selectedIndex = index;
-            const file = this.videoList[index];
+            // Error throttle ป้องกัน loop เร็วเกิน 300ms
+            if (isError) {
+                  const now = Date.now();
+                  if (now - this.lastErrorTime < ERROR_THROTTLE) {
+                        return;
+                  }
+                  this.lastErrorTime = now;
+            }
+
+            this.selectedIndex = (index + this.videoList.length) % this.videoList.length;
+            const file = this.videoList[this.selectedIndex];
             if (!file) return;
 
             this.state = "playing";
             this.errorMessage = null;
+            this.isPaused = false;
+            this.currentVideoWidth = 0;
+            this.currentVideoHeight = 0;
+            this.currentVideoDuration = 0;
+            this.currentVideoTime = 0;
+
             this.cleanupListUi();
 
             if (this.canvas) {
                   this.canvas.style.display = "none";
             }
 
-            // สร้าง element <video> เต็มจอ
+            // ทำลาย iframe เก่าทิ้งอย่างสมบูรณ์เพื่อคืน dmabuf/GPU memory
             this.cleanupPlayback();
-            const video = document.createElement("video");
-            video.className = "w-full h-full absolute inset-0 bg-black z-10";
-            video.autoplay = true;
-            video.playsInline = true;
-            video.loop = this.isLooping;
-            video.muted = this.isMuted;
-            this.applyAspectModeStyle(video);
 
-            // แปลง path สำหรับ asset protocol ของ Tauri
-            let videoSrc = file.path;
-            try {
-                  const { convertFileSrc } = await import("@tauri-apps/api/core");
-                  videoSrc = convertFileSrc(file.path);
-            } catch {
-                  // โหมดทดสอบนอก Tauri
-            }
+            if (!this.container) return;
 
-            video.src = videoSrc;
+            const videoUrl = `${SERVER}/videos/${encodeURIComponent(file.name)}`;
+            const objectFitStyle =
+                  this.aspectMode === "contain"
+                        ? "contain"
+                        : this.aspectMode === "none"
+                          ? "none"
+                          : "fill";
 
-            // จัดการข้อผิดพลาดกรณี Codec ไม่รองรับ
-            video.addEventListener("error", () => {
-                  const err = video.error;
-                  let detail = "รูปแบบไฟล์หรือ Codec ไม่รองรับบนระบบนี้";
-                  if (err?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-                        detail = "รูปแบบวิดีโอหรือตัวถอดรหัส (Codec) ไม่รองรับ";
-                  } else if (err?.code === MediaError.MEDIA_ERR_DECODE) {
-                        detail = "เกิดข้อผิดพลาดในการถอดรหัสวิดีโอ";
-                  }
-                  this.showPlaybackError(detail);
-            });
+            // สร้าง iframe ใหม่เอี่ยมทุกคลิปตามข้อกำหนด
+            const iframe = document.createElement("iframe");
+            iframe.className = "w-full h-full absolute inset-0 bg-black z-10 border-0 pointer-events-auto";
+            iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
 
-            video.addEventListener("loadedmetadata", () => {
-                  this.emitStatus();
-            });
+            iframe.srcdoc = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000000;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: ${objectFitStyle};
+      background: #000000;
+    }
+  </style>
+</head>
+<body>
+  <video id="v" src="${videoUrl}" autoplay ${this.isMuted ? "muted" : ""} playsinline></video>
+  <script>
+    const v = document.getElementById('v');
+    const send = (m) => window.parent.postMessage(m, '*');
 
-            video.addEventListener("play", () => this.emitStatus());
-            video.addEventListener("pause", () => this.emitStatus());
+    v.addEventListener('ended', () => send({ type: 'video-ended' }));
+    v.addEventListener('error', () => {
+      const code = v.error ? v.error.code : 0;
+      send({ type: 'video-error', code });
+    });
 
-            this.container?.appendChild(video);
-            this.videoElement = video;
+    v.addEventListener('loadedmetadata', () => {
+      send({
+        type: 'video-metadata',
+        videoWidth: v.videoWidth,
+        videoHeight: v.videoHeight,
+        duration: v.duration
+      });
+    });
+
+    v.addEventListener('play', () => send({ type: 'video-play' }));
+    v.addEventListener('pause', () => send({ type: 'video-pause' }));
+
+    let last = -1;
+    v.addEventListener('timeupdate', () => {
+      if (v.currentTime !== last) {
+        last = v.currentTime;
+        send({ type: 'video-progress', currentTime: v.currentTime });
+      }
+    });
+
+    window.addEventListener('message', (e) => {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.action === 'toggle-play') {
+        if (v.paused) v.play().catch(() => {});
+        else v.pause();
+      } else if (e.data.action === 'play') {
+        v.play().catch(() => {});
+      } else if (e.data.action === 'pause') {
+        v.pause();
+      } else if (e.data.action === 'mute') {
+        v.muted = !!e.data.value;
+      } else if (e.data.action === 'set-aspect') {
+        v.style.objectFit = e.data.value;
+      }
+    });
+
+    const cleanup = () => {
+      try {
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+      } catch (e) {}
+    };
+    window.addEventListener('pagehide', cleanup);
+    window.addEventListener('beforeunload', cleanup);
+  </script>
+</body>
+</html>`;
+
+            this.container.appendChild(iframe);
+            this.currentIframe = iframe;
+
+            // รีเซ็ตและเริ่ม Watchdog
+            this.lastProgressTime = Date.now();
+            this.startWatchdog();
+
             this.renderPlaybackControls();
-
-            try {
-                  await video.play();
-            } catch (err) {
-                  console.warn("Autoplay block:", err);
-            }
-
-            this.startStatusUpdater();
+            this.emitStatus();
       }
 
-      public playNextVideo(): void {
+      /**
+       * จัดการข้อความที่ส่งมาจาก iframe
+       */
+      private handleIframeMessage(e: MessageEvent): void {
+            if (!this.currentIframe || e.source !== this.currentIframe.contentWindow) {
+                  return;
+            }
+
+            const data = e.data;
+            if (!data || typeof data !== "object") return;
+
+            switch (data.type) {
+                  case "video-ended":
+                        if (this.isLooping) {
+                              this.playNextVideo();
+                        } else if (this.selectedIndex < this.videoList.length - 1) {
+                              this.playNextVideo();
+                        } else {
+                              this.stopVideoAndBackToList();
+                        }
+                        break;
+
+                  case "video-progress":
+                        this.lastProgressTime = Date.now();
+                        this.currentVideoTime = Number(data.currentTime) || 0;
+                        this.emitStatus();
+                        break;
+
+                  case "video-metadata":
+                        this.currentVideoWidth = Number(data.videoWidth) || 0;
+                        this.currentVideoHeight = Number(data.videoHeight) || 0;
+                        this.currentVideoDuration = Number(data.duration) || 0;
+                        this.emitStatus();
+                        break;
+
+                  case "video-play":
+                        this.isPaused = false;
+                        this.emitStatus();
+                        this.updatePlayBtnText();
+                        break;
+
+                  case "video-pause":
+                        this.isPaused = true;
+                        this.emitStatus();
+                        this.updatePlayBtnText();
+                        break;
+
+                  case "video-error": {
+                        const code = Number(data.code) || 0;
+                        let detail = "รูปแบบไฟล์หรือ Codec ไม่รองรับบนระบบนี้";
+                        if (code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+                              detail = "รูปแบบวิดีโอหรือตัวถอดรหัส (Codec) ไม่รองรับ";
+                        } else if (code === MediaError.MEDIA_ERR_DECODE) {
+                              detail = "เกิดข้อผิดพลาดในการถอดรหัสวิดีโอ";
+                        }
+                        this.showPlaybackError(detail);
+                        break;
+                  }
+            }
+      }
+
+      public playNextVideo(isError = false): void {
             if (this.videoList.length === 0) return;
             const next = (this.selectedIndex + 1) % this.videoList.length;
-            void this.playVideo(next);
+            this.playVideo(next, isError);
       }
 
       public playPreviousVideo(): void {
             if (this.videoList.length === 0) return;
             const prev = (this.selectedIndex - 1 + this.videoList.length) % this.videoList.length;
-            void this.playVideo(prev);
+            this.playVideo(prev);
       }
 
       public togglePlayPause(): void {
-            if (!this.videoElement) return;
-            if (this.videoElement.paused) {
-                  void this.videoElement.play();
-            } else {
-                  this.videoElement.pause();
-            }
-            this.emitStatus();
+            this.currentIframe?.contentWindow?.postMessage({ action: "toggle-play" }, "*");
       }
 
       public cycleAspectMode(): void {
@@ -296,29 +466,33 @@ export class VideoTestModule implements TestModule {
                   this.aspectMode = "contain";
             }
 
-            if (this.videoElement) {
-                  this.applyAspectModeStyle(this.videoElement);
-            }
-            this.emitStatus();
-      }
+            const objectFitStyle =
+                  this.aspectMode === "contain"
+                        ? "contain"
+                        : this.aspectMode === "none"
+                          ? "none"
+                          : "fill";
 
-      private applyAspectModeStyle(video: HTMLVideoElement): void {
-            video.style.objectFit = this.aspectMode;
+            this.currentIframe?.contentWindow?.postMessage(
+                  { action: "set-aspect", value: objectFitStyle },
+                  "*"
+            );
+            this.emitStatus();
       }
 
       public toggleLoop(): void {
             this.isLooping = !this.isLooping;
-            if (this.videoElement) {
-                  this.videoElement.loop = this.isLooping;
-            }
+            this.renderPlaybackControls();
             this.emitStatus();
       }
 
       public toggleMute(): void {
             this.isMuted = !this.isMuted;
-            if (this.videoElement) {
-                  this.videoElement.muted = this.isMuted;
-            }
+            this.currentIframe?.contentWindow?.postMessage(
+                  { action: "mute", value: this.isMuted },
+                  "*"
+            );
+            this.renderPlaybackControls();
             this.emitStatus();
       }
 
@@ -335,25 +509,24 @@ export class VideoTestModule implements TestModule {
             this.errorMessage = message;
             this.emitStatus();
 
-            // แสดงแจ้งเตือนบนหน้าจอให้ผู้ใช้เห็นชัดเจนพร้อมปุ่มข้าม
             const existing = document.getElementById("video-error-overlay");
             if (existing) existing.remove();
 
             const overlay = document.createElement("div");
             overlay.id = "video-error-overlay";
             overlay.className =
-                  "absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 p-6 text-center text-white";
+                  "absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/85 p-6 text-center text-white";
             overlay.innerHTML = `
       <div class="max-w-md p-6 rounded-2xl bg-neutral-900 border border-red-500/50 shadow-2xl space-y-4">
-        <div class="text-xs font-mono font-bold text-amber-400 tracking-wider uppercase">[ ERROR / WARNING ]</div>
+        <div class="text-xs font-mono font-bold text-amber-400 tracking-wider uppercase">[ ข้อผิดพลาดตัวถอดรหัสวิดีโอ ]</div>
         <h2 class="text-xl font-bold text-red-400">ไม่สามารถเล่นไฟล์นี้ได้</h2>
         <p class="text-sm text-neutral-300 leading-relaxed">${message}</p>
         <p class="text-xs text-neutral-400 font-mono">ไฟล์: ${this.videoList[this.selectedIndex]?.name ?? ""}</p>
         <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <button id="btn-err-next" type="button" class="touch-btn px-5 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 font-bold text-sm text-white shadow-lg">
+          <button id="btn-err-next" type="button" class="touch-btn px-5 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 font-bold text-sm text-white shadow-lg cursor-pointer">
             เล่นไฟล์ถัดไป [→]
           </button>
-          <button id="btn-err-back" type="button" class="touch-btn px-5 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-bold text-sm text-neutral-200 border border-neutral-700 shadow-lg">
+          <button id="btn-err-back" type="button" class="touch-btn px-5 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-bold text-sm text-neutral-200 border border-neutral-700 shadow-lg cursor-pointer">
             กลับหน้ารายการ [Esc]
           </button>
         </div>
@@ -362,7 +535,7 @@ export class VideoTestModule implements TestModule {
 
             overlay.querySelector("#btn-err-next")?.addEventListener("click", () => {
                   overlay.remove();
-                  this.playNextVideo();
+                  this.playNextVideo(true);
             });
 
             overlay.querySelector("#btn-err-back")?.addEventListener("click", () => {
@@ -373,17 +546,26 @@ export class VideoTestModule implements TestModule {
             this.container?.appendChild(overlay);
       }
 
-      private startStatusUpdater(): void {
-            this.stopStatusUpdater();
-            this.updateIntervalId = window.setInterval(() => {
-                  this.emitStatus();
-            }, 500);
+      /**
+       * Watchdog ป้องกันวิดีโอค้างเงียบ ๆ
+       */
+      private startWatchdog(): void {
+            this.stopWatchdog();
+            this.watchdogIntervalId = window.setInterval(() => {
+                  if (this.state !== "playing" || this.isPaused) return;
+
+                  // หากไม่มี progress นานเกินกำหนด ถือว่าค้าง
+                  if (Date.now() - this.lastProgressTime > WATCHDOG_TIMEOUT) {
+                        console.warn("Watchdog timeout triggered. Skipping to next video.");
+                        this.playNextVideo(true);
+                  }
+            }, WATCHDOG_CHECK);
       }
 
-      private stopStatusUpdater(): void {
-            if (this.updateIntervalId !== null) {
-                  clearInterval(this.updateIntervalId);
-                  this.updateIntervalId = null;
+      private stopWatchdog(): void {
+            if (this.watchdogIntervalId !== null) {
+                  clearInterval(this.watchdogIntervalId);
+                  this.watchdogIntervalId = null;
             }
       }
 
@@ -395,28 +577,21 @@ export class VideoTestModule implements TestModule {
                   return;
             }
 
-            if (!this.videoElement) return;
-
             const file = this.videoList[this.selectedIndex];
             const name = file ? file.name : "วิดีโอ";
-            const res = `${this.videoElement.videoWidth}×${this.videoElement.videoHeight}`;
-            const curTime = formatSeconds(this.videoElement.currentTime);
-            const totalTime = formatSeconds(this.videoElement.duration || 0);
-            const playState = this.videoElement.paused ? "พัก" : "เล่น";
+            const res =
+                  this.currentVideoWidth > 0
+                        ? `${this.currentVideoWidth}×${this.currentVideoHeight}`
+                        : "กำลังโหลด...";
+            const curTime = formatSeconds(this.currentVideoTime);
+            const totalTime = formatSeconds(this.currentVideoDuration);
+            const playState = this.isPaused ? "พัก" : "เล่น";
             const modeLabel = ASPECT_MODE_LABELS[this.aspectMode];
             const loopStr = this.isLooping ? "วนซ้ำ" : "เล่นครั้งเดียว";
             const muteStr = this.isMuted ? "ปิดเสียง" : "เปิดเสียง";
 
-            // อ่านจำนวนเฟรมตกผ่าน getVideoPlaybackQuality
-            let droppedStr = "";
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const q = (this.videoElement as any).getVideoPlaybackQuality?.();
-            if (q) {
-                  droppedStr = ` | เฟรมตก: ${q.droppedVideoFrames}/${q.totalVideoFrames}`;
-            }
-
             this.onStatusChange?.(
-                  `[${playState} ${this.selectedIndex + 1}/${this.videoList.length}] ${name} (${res}) | ${curTime}/${totalTime} | ${modeLabel} | ${loopStr} | ${muteStr}${droppedStr}`
+                  `[${playState} ${this.selectedIndex + 1}/${this.videoList.length}] ${name} (${res}) | ${curTime}/${totalTime} | ${modeLabel} | ${loopStr} | ${muteStr}`
             );
       }
 
@@ -427,17 +602,21 @@ export class VideoTestModule implements TestModule {
       }
 
       private cleanupPlayback(): void {
-            this.stopStatusUpdater();
+            this.stopWatchdog();
             this.cleanupPlaybackControls();
             const errOverlay = document.getElementById("video-error-overlay");
             if (errOverlay) errOverlay.remove();
 
-            if (this.videoElement) {
-                  this.videoElement.pause();
-                  this.videoElement.removeAttribute("src");
-                  this.videoElement.load();
-                  this.videoElement.remove();
-                  this.videoElement = null;
+            if (this.currentIframe) {
+                  this.currentIframe.remove();
+                  this.currentIframe = null;
+            }
+      }
+
+      private updatePlayBtnText(): void {
+            const playBtn = this.playbackControlsEl?.querySelector("#vctrl-play");
+            if (playBtn) {
+                  playBtn.textContent = this.isPaused ? "เล่น" : "พัก";
             }
       }
 
@@ -450,23 +629,22 @@ export class VideoTestModule implements TestModule {
             ctrl.className =
                   "absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 p-2.5 rounded-2xl bg-neutral-950/90 border border-neutral-700/80 shadow-2xl backdrop-blur-sm select-none pointer-events-auto transition-opacity duration-200";
 
-            const isPaused = this.videoElement?.paused ?? false;
-
             ctrl.innerHTML = `
       <button id="vctrl-prev" type="button" class="touch-btn px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-white">
         ◀ ก่อนหน้า
       </button>
       <button id="vctrl-play" type="button" class="touch-btn px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-xs font-bold text-white shadow-md">
-        ${isPaused ? "เล่น" : "พัก"}
+        ${this.isPaused ? "เล่น" : "พัก"}
       </button>
       <button id="vctrl-next" type="button" class="touch-btn px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-white">
         ถัดไป ▶
       </button>
       <button id="vctrl-aspect" type="button" class="touch-btn px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-neutral-200">
-        ${ASPECT_MODE_LABELS[this.aspectMode]}
+        สัดส่วน: ${ASPECT_MODE_LABELS[this.aspectMode]}
       </button>
-      <button id="vctrl-loop" type="button" class="touch-btn px-3 py-2 rounded-xl ${this.isLooping ? "bg-emerald-600/80 text-white" : "bg-neutral-800 text-neutral-300"
-                  } hover:bg-neutral-700 text-xs font-semibold">
+      <button id="vctrl-loop" type="button" class="touch-btn px-3 py-2 rounded-xl ${
+            this.isLooping ? "bg-emerald-600/80 text-white" : "bg-neutral-800 text-neutral-300"
+      } hover:bg-neutral-700 text-xs font-semibold">
         ${this.isLooping ? "วนซ้ำ: ON" : "วนซ้ำ: OFF"}
       </button>
       <button id="vctrl-mute" type="button" class="touch-btn px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-xs font-semibold text-neutral-200">
@@ -487,7 +665,6 @@ export class VideoTestModule implements TestModule {
             ctrl.querySelector("#vctrl-play")?.addEventListener("click", (e) => {
                   e.stopPropagation();
                   this.togglePlayPause();
-                  this.renderPlaybackControls();
             });
 
             ctrl.querySelector("#vctrl-next")?.addEventListener("click", (e) => {
@@ -504,13 +681,11 @@ export class VideoTestModule implements TestModule {
             ctrl.querySelector("#vctrl-loop")?.addEventListener("click", (e) => {
                   e.stopPropagation();
                   this.toggleLoop();
-                  this.renderPlaybackControls();
             });
 
             ctrl.querySelector("#vctrl-mute")?.addEventListener("click", (e) => {
                   e.stopPropagation();
                   this.toggleMute();
-                  this.renderPlaybackControls();
             });
 
             ctrl.querySelector("#vctrl-back")?.addEventListener("click", (e) => {
@@ -520,7 +695,6 @@ export class VideoTestModule implements TestModule {
 
             this.container.appendChild(ctrl);
             this.playbackControlsEl = ctrl;
-            // ค้างแถบควบคุมไว้ถาวรตามความต้องการของผู้ใช้ (ไม่ซ่อนอัตโนมัติ)
       }
 
       private cleanupPlaybackControls(): void {
@@ -589,37 +763,44 @@ export class VideoTestModule implements TestModule {
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             ${this.videoList
-                              .map((file, idx) => {
-                                    const isSelected = idx === this.selectedIndex;
-                                    const sizeMb = (file.size_bytes / (1024 * 1024)).toFixed(1);
-                                    const ext = file.name.split(".").pop()?.toUpperCase() ?? "VIDEO";
-                                    return `
+                  .map((file, idx) => {
+                        const isSelected = idx === this.selectedIndex;
+                        const sizeMb =
+                              file.size_bytes > 0
+                                    ? (file.size_bytes / (1024 * 1024)).toFixed(1) + " MB"
+                                    : "";
+                        const ext = file.name.split(".").pop()?.toUpperCase() ?? "VIDEO";
+                        return `
                   <button
                     type="button"
                     data-video-idx="${idx}"
-                    class="touch-btn text-left flex flex-col justify-between p-4 rounded-2xl border transition-all min-h-[96px] ${isSelected
-                                                ? "bg-cyan-950/40 border-cyan-500 shadow-lg shadow-cyan-500/10"
-                                                : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-850"
-                                          }"
+                    class="touch-btn text-left flex flex-col justify-between p-4 rounded-2xl border transition-all min-h-[96px] ${
+                          isSelected
+                                ? "bg-cyan-950/40 border-cyan-500 shadow-lg shadow-cyan-500/10"
+                                : "bg-neutral-900 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-850"
+                    }"
                   >
                     <div class="flex items-center justify-between w-full mb-2">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold ${isSelected
-                                                ? "bg-cyan-500 text-neutral-950"
-                                                : "bg-neutral-800 text-neutral-300"
-                                          }">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
+                            isSelected
+                                  ? "bg-cyan-500 text-neutral-950"
+                                  : "bg-neutral-800 text-neutral-300"
+                      }">
                         #${idx + 1} • ${ext}
                       </span>
-                      <span class="text-[11px] font-mono text-neutral-400">
-                        ${sizeMb} MB
-                      </span>
+                      ${
+                        sizeMb
+                              ? `<span class="text-[11px] font-mono text-neutral-400">${sizeMb}</span>`
+                              : ""
+                      }
                     </div>
                     <div class="font-bold text-sm sm:text-base text-white truncate w-full" title="${file.name}">
                       ${file.name}
                     </div>
                   </button>
                 `;
-                              })
-                              .join("")}
+                  })
+                  .join("")}
           </div>
         </div>
       `;
@@ -678,7 +859,7 @@ export class VideoTestModule implements TestModule {
             overlay.querySelectorAll<HTMLButtonElement>("[data-video-idx]").forEach((btn) => {
                   btn.addEventListener("click", () => {
                         const idx = Number.parseInt(btn.getAttribute("data-video-idx") || "0", 10);
-                        void this.playVideo(idx);
+                        this.playVideo(idx);
                   });
             });
 

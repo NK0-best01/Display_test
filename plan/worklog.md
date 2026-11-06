@@ -299,3 +299,55 @@
   - `npm run build` (`tsc && vite build`): ผ่าน 100% ไม่มีข้อผิดพลาด
   - `cargo check`: ผ่าน 100% ทั้ง Library และ Binary
   - รัน `scratch/verify-part16.mjs`: PASS 100% ทุกรายการ (รวมถึงการจำลองวงจรชีวิตเข้า-ออก 50 รอบ)
+
+---
+
+## Part 17: แก้ไขบั๊กปุ่มผลลัพธ์ Touch Axis (หัวข้อ 6.1) และข้อกำหนด Codec วิดีโอ Linux
+- **สถานะ**: แก้ไขและทดสอบเสร็จสมบูรณ์ พร้อมใช้งาน
+- **Branch**: `edit-and-update`
+- **สิ่งที่ดำเนินการ**:
+  1. **แก้ไขปัญหาปุ่มผลลัพธ์ในการ์ดกลางจอของ Touch Axis (หัวข้อ 6.1 แตะ 4 มุม)** ([`src/tests/touch-axis.ts`](file:///d:/Ai/โปรเจค_roboq/display_test/src/tests/touch-axis.ts)):
+     - **สาเหตุของบั๊กเดิม:** เมื่อผู้ใช้แตะเป้า 4 มุมครบ ระบบจะแสดงการ์ดสรุปผล (`drawAnalysisSummaryCard`) ที่กึ่งกลางจอภาพ แต่ในฟังก์ชัน `handleButtonsPointerDown` ดักจับพิกัดเฉพาะปุ่มที่ขอบล่างสุดของจอ (ซึ่งเป็นปุ่มของหน้า 6.2 Trail mode) ทำให้เมื่อคลิกหรือแตะปุ่ม "ทดสอบใหม่ (R)" และปุ่ม "ทดสอบลากเส้น →" (เปลี่ยนหน้า) กลางจอ จะกดไม่ติดเลย
+     - **การแก้ไข:**
+       - เพิ่มการคำนวณและตรวจจับพิกัดปุ่มในการ์ดผลลัพธ์กลางจอเมื่อ `stage === "calibration"` และแตะครบ 4 จุดแล้ว
+       - แตะปุ่ม "ทดสอบใหม่ (R)" → สั่ง `resetCalibration()` ทันที
+       - แตะปุ่ม "ทดสอบลากเส้น →" → สลับไปโหมดลากเส้น `setStage("trail")` ทันที
+       - ขยาย Hit Area เพิ่มเติมเพื่อรองรับการแตะสัมผัสบนจอ Touch Screen ให้กดติดง่าย
+       - เพิ่มการตรวจจับ Cursor Pointer เมื่อนำเมาส์ไปชี้เหนือปุ่ม
+       - เพิ่มคีย์ลัด <kbd>Space</kbd> / <kbd>Enter</kbd> ให้สามารถกดไปต่อที่หน้าลากเส้นได้สะดวก
+  2. **ข้อสรุปและแนวทางการเล่นไฟล์วิดีโอบน Linux Ubuntu (หัวข้อ 8)**:
+     - **สาเหตุ:** WebKitGTK ใน Ubuntu เล่นวิดีโอผ่านระบบ GStreamer ของ OS ซึ่งค่าเริ่มต้นของ Ubuntu จะไม่มีปลั๊กอินสำหรับถอดรหัส Proprietary Codec (MP4 / H.264 / AAC) มาให้ (ต่างจากเครื่องเล่นอื่น เช่น VLC ที่มี Built-in Codec ในตัว)
+     - **แนวทางมาตรฐาน (Universal Format):** แนะนำให้ใช้ไฟล์วิดีโอรูปแบบ **`.webm` (VP8/VP9 Codec + Opus Audio)** ซึ่งเป็นมาตรฐานเปิด (Royalty-free) ที่รองรับได้ทันทีทั้งบน **Windows (WebView2)** และ **Linux (WebKitGTK)** 100% โดยไม่ต้องติดตั้งปลั๊กอินหรือโปรแกรมใดๆ เพิ่มเติมในเครื่อง
+     - **แนวทางทางเลือก (Linux Package):** หากต้องการเล่นไฟล์ `.mp4` เดิม สามารถติดตั้งแพ็กเกจ GStreamer ใน Ubuntu ด้วยคำสั่ง:
+       `sudo apt update && sudo apt install -y gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-plugins-good`
+- **ผลการทดสอบ (Verification Results)**:
+  - `npm run build` (`tsc && vite build`): ผ่าน 100% ไม่มี Type Error
+  - ทดสอบการกดปุ่ม "ทดสอบใหม่ (R)" และ "ทดสอบลากเส้น →" ในหน้า 6.1: ทำงานถูกต้อง แม่นยำ และสลับหน้าได้สมบูรณ์
+
+---
+
+## Part 18: พัฒนาระบบเล่นวิดีโอระดับ Kiosk 24 ชม. บน Tauri v2 + Linux (WebKitGTK) ตาม message.txt
+- **สถานะ**: พัฒนาและทดสอบเสร็จสมบูรณ์ 100%
+- **Branch**: `edit-and-update`
+- **สิ่งที่ดำเนินการ**:
+  1. **สถาปัตยกรรม Backend: Local HTTP Streaming Server (Rust)**:
+     - เพิ่ม dependencies: `axum = "0.7"`, `tokio` (features: `fs`, `io-util`, `net`), `tokio-util` (features: `io`), `tower-http` (features: `cors`)
+     - ผูก Server บนพอร์ตปลอดภัย `127.0.0.1:8765` ตอนเริ่มแอป (`tauri::async_runtime::spawn`)
+     - รองรับ Route `GET /videos/index.json` คืนรายการไฟล์วิดีโอแบบสด (`Cache-Control: no-store`) กรองเฉพาะนามสกุลวิดีโอ (`mp4, webm, mkv, mov, m4v, ogv`)
+     - รองรับ Route `GET /videos/:filename` พร้อมระบบ **HTTP 206 Partial Content (HTTP Range Request)**:
+       - รองรับทั้ง `bytes=start-end`, `bytes=start-`, และ `bytes=-suffix`
+       - สตรีมผ่าน `tokio_util::io::ReaderStream` แบบไม่โหลดเข้า RAM ทั้งก้อน
+       - ป้องกัน Directory Traversal ด้วยการเช็ค `..`, `/`, `\` (403 Forbidden)
+  2. **สถาปัตยกรรม Frontend: Dynamic Iframe + Watchdog (Vanilla TypeScript)**:
+     - เลิกใช้การเปลี่ยน `src` บน `<video>` ตัวเดิม เพื่อตัดปัญหา dmabuf / GPU memory leak บน WebKitGTK 100%
+     - เปลี่ยนมาสร้างและทำลาย `<iframe>` ใหม่เอี่ยมทุกครั้งที่เปลี่ยนคลิปหรือเริ่มเล่นใหม่
+     - ฉีด `srcdoc` พร้อม `<video src="http://127.0.0.1:8765/videos/..." autoplay playsinline>`
+     - สื่อสารข้าม Iframe ผ่าน `window.postMessage` (`video-ended`, `video-progress`, `video-metadata`, `video-error`)
+     - ระบบ **Watchdog**: ตรวจจับความคืบหน้าทุก 5 วินาที หากไม่มี progress นานเกิน 12 วินาที จะสั่งข้ามไปคลิปถัดไปอัตโนมัติ ไม่ค้างหน้าดำ
+     - ระบบ **Error Throttle**: ป้องกันการวนลูป error ถี่เกิน 300ms
+     - คงฟังก์ชันแถบควบคุมเต็มรูปแบบ: เล่น/หยุด, เปลี่ยนคลิป, โหมดสัดส่วนภาพ (`Z`), วนซ้ำ (`L`), เปิด/ปิดเสียง (`M`), ย้อนกลับ (`Esc`)
+- **ผลการทดสอบ (Verification Results)**:
+  - `cargo check`: ผ่าน 100% ไม่มีข้อผิดพลาด
+  - `npm run build`: ผ่าน 100% (`tsc && vite build`)
+
+
